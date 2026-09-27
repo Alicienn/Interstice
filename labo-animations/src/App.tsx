@@ -6,7 +6,7 @@ import { Constellation } from "./pistes/Constellation";
 import { Marbrure } from "./pistes/Marbrure";
 import { Nuee } from "./pistes/Nuee";
 import { Rideau } from "./pistes/Rideau";
-import { Synapses } from "./pistes/Synapses";
+import { Trace } from "./pistes/Trace";
 import { preparer, SCENARIOS } from "./scenario";
 
 interface Piste {
@@ -27,11 +27,11 @@ function SceneRideau() {
 
 const PISTES: Piste[] = [
   {
-    id: "synapses", nom: "Synapses", C: Synapses,
-    resume: "Un réseau neuronal en 2D, gris et blanc, qui s'évapore dans le texte.",
-    intention: "Des neurones naissent à des positions pseudo-aléatoires et se relient par des courbes fines ; des influx parcourent les connexions et chaque source consultée déclenche une décharge qui se propage dans une grappe. Les neurones anciens montent en s'estompant. À la rédaction, tout s'évapore vers le haut et chaque mot se condense à partir de grains.",
-    quand: "Pour montrer un raisonnement vivant sans couleur ni effet criard, dans la sobriété de l'interface.",
-    technique: "Canvas 2D : réseau généré de façon déterministe (graine fixe), courbes de Bézier quadratiques avec croissance par De Casteljau, ondes de décharge, grains par mot mesurés sur le texte HTML.",
+    id: "trace", nom: "Tracé", C: Trace,
+    resume: "Un réseau tracé en traits droits, qui encaisse chaque document lu.",
+    intention: "Une tête lumineuse trace des segments droits de nœud en nœud et le réseau se densifie dans une zone compacte. Quand l'IA lit un document, le tracé file vers un nœud-document qui encaisse l'impact : impulsion, éclat de traits radiaux, connexions illuminées, nom du document. À la rédaction, le réseau se dissout vers le haut et les mots se condensent à partir de grains fins.",
+    quand: "Pour une interface sobre et précise : on voit l'IA parcourir le droit, sans effet décoratif.",
+    technique: "Canvas 2D : nœuds répartis par échantillonnage de Poisson, parcours déterministe calé sur les appels d'outils, segments en easeInOut, sillage qui refroidit, grains mesurés sur le texte HTML.",
   },
   {
     id: "constellation", nom: "Constellation", C: Constellation,
@@ -142,7 +142,7 @@ export function App() {
       <header className="barre">
         <div className="titre">
           <h1>Chargement des réponses</h1>
-          <p>Synapses en tête ; les pistes 3D et Rideau, déjà retenue, restent consultables.</p>
+          <p>Tracé en tête ; les pistes 3D et Rideau, déjà retenue, restent consultables.</p>
         </div>
         <div className="commandes">
           <div className="segment" role="radiogroup" aria-label="Scénario">
