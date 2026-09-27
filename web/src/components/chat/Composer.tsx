@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, Brain, Square } from "lucide-react";
 import type { ModeleChoix } from "../../api/types";
-import { niveauLabel } from "../../lib/format";
+import { modelDropdownOptions, thinkingDropdownOptions } from "../../lib/options";
+import { Dropdown } from "../ui/Dropdown";
 
 type Props = {
   streaming: boolean;
@@ -23,15 +24,9 @@ export function Composer(p: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const modele = p.models.find((m) => m.key === p.modelKey) ?? null;
 
-  const groupes = useMemo(() => {
-    const map = new Map<string, { name: string; items: ModeleChoix[] }>();
-    for (const m of p.models) {
-      const g = map.get(m.provider_id) ?? { name: m.provider_name, items: [] };
-      g.items.push(m);
-      map.set(m.provider_id, g);
-    }
-    return [...map.values()];
-  }, [p.models]);
+  const modelOptions = useMemo(() => modelDropdownOptions(p.models), [p.models]);
+  const niveaux = modele?.thinking.supported ? modele.thinking.levels : [];
+  const thinkingOptions = useMemo(() => thinkingDropdownOptions(niveaux), [niveaux]);
 
   useEffect(() => {
     if (p.preset) {
@@ -59,8 +54,6 @@ export function Composer(p: Props) {
     p.onSend(text.trim());
     setText("");
   };
-
-  const niveaux = modele?.thinking.supported ? modele.thinking.levels : [];
 
   return (
     <div className="composer-wrap">
@@ -94,42 +87,28 @@ export function Composer(p: Props) {
               Ajouter un modèle…
             </button>
           ) : (
-            <select
-              className="select select-compact"
-              value={p.modelKey ?? ""}
-              onChange={(e) => p.onModelChange(e.target.value)}
-              aria-label="Modèle"
+            <Dropdown
+              ariaLabel="Modèle"
               title="Modèle"
-            >
-              {groupes.map((g) => (
-                <optgroup key={g.name} label={g.name}>
-                  {g.items.map((m) => (
-                    <option key={m.key} value={m.key}>
-                      {m.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              value={p.modelKey ?? ""}
+              options={modelOptions}
+              onChange={p.onModelChange}
+              searchPlaceholder="Rechercher un modèle…"
+              minPopoverWidth={300}
+            />
           )}
           {modele?.thinking.supported &&
             (niveaux.length > 0 ? (
-              <label className="thinking-select" title="Niveau de réflexion">
-                <Brain size={14} aria-hidden />
-                <select
-                  className="select select-compact"
-                  value={p.thinking ?? ""}
-                  onChange={(e) => p.onThinkingChange(e.target.value || null)}
-                  aria-label="Niveau de réflexion"
-                >
-                  <option value="">Réflexion désactivée</option>
-                  {niveaux.map((l) => (
-                    <option key={l} value={l}>
-                      Réflexion {niveauLabel(l).toLowerCase()}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Dropdown
+                ariaLabel="Niveau de réflexion"
+                title="Niveau de réflexion"
+                icon={<Brain size={14} />}
+                value={p.thinking ?? ""}
+                options={thinkingOptions}
+                onChange={(v) => p.onThinkingChange(v || null)}
+                searchable={false}
+                minPopoverWidth={220}
+              />
             ) : (
               <span className="thinking-auto" title="Ce modèle réfléchit sans niveau réglable">
                 <Brain size={14} aria-hidden /> Réflexion automatique

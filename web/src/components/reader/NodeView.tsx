@@ -42,7 +42,6 @@ function Noeud({ n, date, onNavigate }: { n: VueNoeud; date: string | null; onNa
     <div className="node">
       <Breadcrumb chemin={n.chemin} date={date} onNavigate={onNavigate} />
       <header className="node-head">
-        <div className="art-code smallcaps">{n.kind === "texte" ? "Texte" : "Section"}</div>
         <h2 className="node-title">{n.titre}</h2>
         <div className="node-meta">
           {sections > 0 && <span>{nombre(sections)} {sections > 1 ? "subdivisions" : "subdivision"}</span>}

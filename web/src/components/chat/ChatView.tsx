@@ -4,7 +4,7 @@ import { api } from "../../api/client";
 import type { ModeleChoix, Reglages } from "../../api/types";
 import { useStoredState } from "../../hooks/useStoredState";
 import type { ReaderTarget } from "../../lib/reader";
-import { chatReducer, initialChatState } from "../../state/chatReducer";
+import { chatReducer, initialChatState, stripGeneration } from "../../state/chatReducer";
 import { Composer } from "./Composer";
 import { MessageView } from "./MessageView";
 
@@ -29,6 +29,17 @@ const SUGGESTIONS = [
 ];
 
 const STOP_GRACE_MS = 4000;
+
+/**
+ * Début d'une génération pour le compteur : horodatage de la question (serveur) s'il est antérieur à
+ * celui de la bulle assistant (qui, lors d'un rejeu /stream, vaut l'heure du rattachement).
+ */
+function debutGeneration(assistant: string, question: string | undefined): number {
+  const a = Date.parse(assistant);
+  const q = question ? Date.parse(question) : NaN;
+  const t = Number.isNaN(q) ? a : Number.isNaN(a) ? q : Math.min(a, q);
+  return Number.isNaN(t) ? Date.now() : Math.min(t, Date.now());
+}
 
 export function ChatView(p: Props) {
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
@@ -71,15 +82,55 @@ export function ChatView(p: Props) {
     let alive = true;
     api
       .getConversation(initialId)
-      .then((c) => alive && dispatch({ type: "load", messages: c.messages }))
-      .catch((e: unknown) => alive && setLoadError(e instanceof Error ? e.message : String(e)))
-      .finally(() => alive && setLoading(false));
+      .then((c) => {
+        if (!alive) return;
+        setLoading(false);
+        if (c.generation_en_cours) {
+          // Génération en arrière-plan : on retire le message partiel et sa question, puis on se
+          // rattache au flux (rejeu depuis le début, puis direct).
+          dispatch({ type: "load", messages: stripGeneration(c.messages, c.generation_message_id) });
+          void attach(c.id);
+        } else dispatch({ type: "load", messages: c.messages });
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setLoading(false);
+        setLoadError(e instanceof Error ? e.message : String(e));
+      });
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialId]);
 
-  // Abandon de la lecture du flux au démontage (la génération continue côté serveur).
+  /** Rattachement à une génération en cours côté serveur (GET /stream). */
+  async function attach(id: string) {
+    const now = () => new Date().toISOString();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    stickRef.current = true;
+    dispatch({ type: "attach" });
+    try {
+      const enCours = await api.resumeStream(id, (event) => dispatch({ type: "event", event, now: now() }), ctrl.signal);
+      if (!enCours) {
+        // Terminée entre-temps (204) : on recharge la version définitive.
+        const c = await api.getConversation(id);
+        if (!ctrl.signal.aborted) dispatch({ type: "load", messages: c.messages });
+      }
+    } catch (e) {
+      const aborted = ctrl.signal.aborted || (e instanceof DOMException && e.name === "AbortError");
+      if (!aborted) dispatch({ type: "local_error", message: e instanceof Error ? e.message : String(e), now: now() });
+    } finally {
+      if (abortRef.current === ctrl) abortRef.current = null;
+      if (!ctrl.signal.aborted) {
+        dispatch({ type: "finish" });
+        void p.onActivity();
+      }
+    }
+  }
+
+  // Au démontage (changement de conversation) : on abandonne seulement la LECTURE du flux.
+  // Ne jamais appeler /stop ici : la génération continue côté serveur et pourra être rejointe.
   useEffect(() => () => abortRef.current?.abort(), []);
 
   // ── Défilement : reste collé en bas si l'utilisateur y était
@@ -189,21 +240,25 @@ export function ChatView(p: Props) {
               </div>
             </div>
           )}
-          {state.messages.map((m) => (
-            <MessageView
-              key={m.id}
-              message={m}
-              live={state.streaming && m.id === state.assistantId}
-              models={p.models}
-              activeTarget={p.activeTarget}
-              onOpenTarget={p.onOpenTarget}
-            />
-          ))}
+          {state.messages.map((m, i) => {
+            const live = state.streaming && m.id === state.assistantId;
+            return (
+              <MessageView
+                key={m.id}
+                message={m}
+                live={live}
+                startedAt={live ? debutGeneration(m.created_at, state.messages[i - 1]?.created_at) : null}
+                models={p.models}
+                activeTarget={p.activeTarget}
+                onOpenTarget={p.onOpenTarget}
+              />
+            );
+          })}
           {state.streaming && state.messages[state.messages.length - 1]?.role === "user" && (
             <div className="msg msg-assistant live">
-              <div className="pending">
-                <span className="pending-bar" />
-                Envoi…
+              <div className="work-live">
+                <span className="work-dot" aria-hidden />
+                <span className="shimmer">Envoi…</span>
               </div>
             </div>
           )}

@@ -2,7 +2,7 @@
 
 // ─── 1. Fournisseurs de modèles ──────────────────────────────────────────────
 
-export type ThinkingSource = "api" | "heuristique" | "manuel";
+export type ThinkingSource = "api" | "heuristique" | "manuel" | "catalogue";
 
 export type ThinkingSupport = {
   supported: boolean;
@@ -28,11 +28,17 @@ export type Fournisseur = {
   models: ModeleActive[];
 };
 
+/** Liste de l'API du fournisseur ∪ catalogue models.dev. */
 export type ModeleDistant = {
   id: string;
   owned_by?: string | null;
+  label?: string | null;
   context_length?: number | null;
+  max_output?: number | null;
+  /** Source « catalogue » (models.dev) > « api » > « heuristique ». */
   thinking: ThinkingSupport;
+  /** « catalogue » : connu de models.dev mais non listé par GET /models du fournisseur. */
+  origine: "api" | "api+catalogue" | "catalogue";
   enabled: boolean;
 };
 
@@ -65,7 +71,7 @@ export type Reglages = {
 
 // ─── 2. Conversations ────────────────────────────────────────────────────────
 
-export type DocKind = "article" | "section" | "texte" | "recherche";
+export type DocKind = "article" | "section" | "texte" | "recherche" | "bofip";
 
 export type DocRef = {
   kind: DocKind;
@@ -94,6 +100,8 @@ export type Usage = {
   input_tokens?: number;
   output_tokens?: number;
   cache_read_tokens?: number;
+  /** Durée réelle de la génération (aussi dans message_end.usage). */
+  duree_ms?: number;
 };
 
 export type Message = {
@@ -107,8 +115,18 @@ export type Message = {
   usage?: Usage | null;
 };
 
-export type ConversationResume = { id: string; title: string; updated_at: string };
-export type Conversation = ConversationResume & { messages: Message[] };
+export type ConversationResume = {
+  id: string;
+  title: string;
+  updated_at: string;
+  /** Une génération tourne côté serveur (indépendamment de toute connexion). */
+  generation_en_cours?: boolean;
+};
+export type Conversation = ConversationResume & {
+  messages: Message[];
+  /** Message assistant partiel de la génération en cours (sauvegardé au fil de l'eau). */
+  generation_message_id?: string | null;
+};
 
 export type EnvoiMessage = {
   content: string;
@@ -148,6 +166,15 @@ export type Renvoi = {
 
 export type VersionArticle = { id: string; etat: string; date_debut: string; date_fin: string };
 
+export type DoctrineArticle = {
+  id: string; // PGP
+  boi: string;
+  titre: string;
+  nature: string;
+  date: string;
+  occurrences: number;
+};
+
 export type VueArticle = {
   id: string;
   cle: string;
@@ -165,6 +192,8 @@ export type VueArticle = {
   versions: VersionArticle[];
   renvois_sortants: Renvoi[];
   renvois_entrants: Renvoi[];
+  /** Documents BOFiP citant l'article (vide si le BOFiP n'est pas ingéré ; absent sur un ancien backend). */
+  doctrine?: DoctrineArticle[];
 };
 
 export type EnfantNoeud = {
@@ -203,6 +232,90 @@ export type TexteCorpus = {
   fiscal: boolean;
   nb_articles_vigueur: number;
 };
+
+// ─── 3 bis. BOFiP-Impôts ─────────────────────────────────────────────────────
+
+export type MietteBofip = { id: string; noeud: string; code: string | null; titre: string };
+
+export type RefBofip = {
+  id: string;
+  boi: string | null;
+  titre: string | null;
+  nature: string | null;
+  date: string | null;
+  disponible: boolean;
+  type: string;
+  cible_type: string;
+};
+
+export type FichierBofip = {
+  pgp: string;
+  type: string;
+  titre: string | null;
+  mime: string | null;
+  taille: number | null;
+  chemin: string | null;
+};
+
+export type ArticleCite = {
+  code: string;
+  num: string;
+  texte_cid: string | null;
+  article_id: string | null;
+  libelle: string;
+  occurrences: number;
+};
+
+export type VueBofip = {
+  id: string;
+  pgp: string;
+  boi: string;
+  boi_base: string;
+  titre: string;
+  serie: string;
+  division: string | null;
+  nature: "Contenu" | "Actualité";
+  type_contenu: string | null;
+  date: string;
+  permalien: string | null;
+  courant: boolean;
+  homonymes: unknown[];
+  chemin: MietteBofip[];
+  html: string;
+  relations: { sortantes: RefBofip[]; entrantes: RefBofip[]; fichiers: FichierBofip[] };
+  articles_cites: ArticleCite[];
+  versions: { id: string; boi: string; date: string; motif: string }[];
+};
+
+export type EnfantBofip = {
+  noeud: string;
+  id: string | null; // PGP si le nœud est un document
+  code: string | null;
+  titre: string;
+  origine: string;
+  nb_documents: number;
+};
+
+export type VueBofipNoeud = {
+  noeud: string | null;
+  id: string | null;
+  code: string | null;
+  titre: string;
+  chemin: MietteBofip[];
+  enfants: EnfantBofip[];
+};
+
+export type LigneRechercheBofip = {
+  id: string;
+  boi: string;
+  titre: string;
+  serie: string;
+  nature: string;
+  date: string;
+  extrait_html: string;
+};
+
+export type ResultatRechercheBofip = { resultats: LigneRechercheBofip[] };
 
 // ─── 4. Divers ───────────────────────────────────────────────────────────────
 

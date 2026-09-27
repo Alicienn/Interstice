@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { api } from "../../api/client";
 import type { Fournisseur, ModeleChoix, Reglages } from "../../api/types";
-import { niveauLabel } from "../../lib/format";
+import { modelDropdownOptions, thinkingDropdownOptions } from "../../lib/options";
+import { Dropdown } from "../ui/Dropdown";
 import { ModelPicker } from "./ModelPicker";
 import { ProviderForm, TYPE_LABEL } from "./ProviderForm";
 
@@ -247,11 +248,6 @@ function Defaults({
 }) {
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [err, setErr] = useState<string | null>(null);
-  const groupes = useMemo(() => {
-    const map = new Map<string, ModeleChoix[]>();
-    for (const m of models) map.set(m.provider_name, [...(map.get(m.provider_name) ?? []), m]);
-    return [...map.entries()];
-  }, [models]);
   const modele = models.find((m) => m.key === reglages.default_model_key) ?? null;
   const levels = modele?.thinking.supported ? modele.thinking.levels : [];
 
@@ -270,50 +266,43 @@ function Defaults({
 
   return (
     <div className="defaults">
-      <label className="field">
-        <span>Modèle par défaut</span>
-        <select
-          className="select"
+      <div className="field">
+        <span className="field-label">Modèle par défaut</span>
+        <Dropdown
+          variant="field"
+          ariaLabel="Modèle par défaut"
           value={reglages.default_model_key ?? ""}
-          onChange={(e) => {
-            const key = e.target.value || null;
+          options={[{ value: "", label: "Aucun (premier modèle disponible)" }, ...modelDropdownOptions(models)]}
+          searchPlaceholder="Rechercher un modèle…"
+          onChange={(v) => {
+            const key = v || null;
             const m = models.find((x) => x.key === key);
             const lv = m?.thinking.supported ? m.thinking.levels : [];
             const th = reglages.default_thinking && lv.includes(reglages.default_thinking) ? reglages.default_thinking : null;
             void save({ default_model_key: key, default_thinking: th });
           }}
-        >
-          <option value="">— Aucun (premier modèle disponible) —</option>
-          {groupes.map(([name, items]) => (
-            <optgroup key={name} label={name}>
-              {items.map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-      <label className="field">
-        <span>Réflexion par défaut</span>
-        <select
-          className="select"
+        />
+      </div>
+      <div className="field">
+        <span className="field-label">Réflexion par défaut</span>
+        <Dropdown
+          variant="field"
+          ariaLabel="Réflexion par défaut"
+          icon={<Brain size={14} />}
           value={reglages.default_thinking ?? ""}
+          options={thinkingDropdownOptions(levels)}
+          searchable={false}
           disabled={levels.length === 0}
-          onChange={(e) => void save({ ...reglages, default_thinking: e.target.value || null })}
-        >
-          <option value="">Désactivée</option>
-          {levels.map((l) => (
-            <option key={l} value={l}>
-              {niveauLabel(l)} ({l})
-            </option>
-          ))}
-        </select>
+          onChange={(v) => void save({ ...reglages, default_thinking: v || null })}
+        />
         <span className="hint">
-          {modele && !modele.thinking.supported ? "Ce modèle ne propose pas de réflexion réglable." : " "}
+          {modele && !modele.thinking.supported
+            ? "Ce modèle ne propose pas de réflexion réglable."
+            : modele && levels.length === 0
+              ? "Ce modèle réfléchit sans niveau réglable."
+              : " "}
         </span>
-      </label>
+      </div>
       <div className="defaults-state" aria-live="polite">
         {state === "saving" && (
           <>

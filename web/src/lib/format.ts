@@ -84,6 +84,10 @@ const OUTILS: Record<string, string> = {
   rechercher: "Recherche plein texte",
   renvois: "Renvois",
   modifications: "Modifications",
+  bofip_plan: "Plan du BOFiP",
+  bofip_lire: "Lecture BOFiP",
+  bofip_rechercher: "Recherche BOFiP",
+  bofip_pour_article: "Doctrine d'un article",
 };
 
 export function nomOutil(name: string): string {
@@ -119,11 +123,12 @@ export function nombre(n: number): string {
   return n.toLocaleString("fr-FR");
 }
 
-/** 400000 → « 400 k » ; 1048576 → « 1 M ». */
+/** 400000 → « 400k » ; 1048576 → « 1M » ; 8192 → « 8k ». */
 export function contexte(n: number | null | undefined): string {
   if (!n) return "";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
-  return `${Math.round(n / 1000)} k`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })}M`;
+  if (n >= 1000) return `${Math.round(n / 1000)}k`;
+  return String(n);
 }
 
 export const NIVEAUX_LABEL: Record<string, string> = {
@@ -143,4 +148,22 @@ export const SOURCE_LABEL: Record<string, string> = {
   api: "déclaré par l'API",
   heuristique: "déduit du nom",
   manuel: "réglé à la main",
+  catalogue: "catalogue models.dev",
 };
+
+/** Dernier segment d'un titre BOFiP (« RPPM - Plus-values - … - Report » → « Report »). */
+export function libelleCourt(titre: string | null | undefined): string {
+  const parts = (titre ?? "")
+    .split(/\s+[-–]\s+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts[parts.length - 1] ?? titre ?? "";
+}
+
+/** Taille de fichier lisible. */
+export function taille(octets: number | null | undefined): string {
+  if (!octets) return "";
+  if (octets < 1024) return `${octets} o`;
+  if (octets < 1024 * 1024) return `${Math.round(octets / 1024)} Ko`;
+  return `${(octets / 1024 / 1024).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Mo`;
+}

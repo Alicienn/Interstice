@@ -16,6 +16,9 @@ import type {
   PatchFournisseur,
   Reglages,
   ResultatRecherche,
+  ResultatRechercheBofip,
+  VueBofip,
+  VueBofipNoeud,
   Sante,
   StreamEvent,
   TexteCorpus,
@@ -93,6 +96,15 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 
 const enc = encodeURIComponent;
 
+async function lireFlux(res: Response, onEvent: (ev: StreamEvent) => void): Promise<void> {
+  if (!res.ok) throw await errorFrom(res);
+  if (!res.body) throw new ApiError(res.status, "Réponse sans corps");
+  await readSSE(res.body, (msg) => {
+    const ev = toStreamEvent(msg.event, msg.data);
+    if (ev) onEvent(ev);
+  });
+}
+
 export const api = {
   // ── Fournisseurs
   listProviders: () => request<Fournisseur[]>("GET", "/providers"),
@@ -137,12 +149,22 @@ export const api = {
     };
     if (signal) init.signal = signal;
     const res = await f(url(`/conversations/${enc(id)}/messages`), init);
-    if (!res.ok) throw await errorFrom(res);
-    if (!res.body) throw new ApiError(res.status, "Réponse sans corps");
-    await readSSE(res.body, (msg) => {
-      const ev = toStreamEvent(msg.event, msg.data);
-      if (ev) onEvent(ev);
-    });
+    await lireFlux(res, onEvent);
+  },
+
+  /**
+   * Se rattache à la génération en cours d'une conversation (rejeu depuis `user_message`, puis direct).
+   * Renvoie `false` si aucune génération n'est en cours (204). Abandonner la lecture (signal)
+   * n'arrête PAS la génération côté serveur ; seul `stopConversation` le fait.
+   */
+  async resumeStream(id: string, onEvent: (ev: StreamEvent) => void, signal?: AbortSignal): Promise<boolean> {
+    const f = await getFetch();
+    const init: RequestInit = { method: "GET", headers: { Accept: "text/event-stream" } };
+    if (signal) init.signal = signal;
+    const res = await f(url(`/conversations/${enc(id)}/stream`), init);
+    if (res.status === 204) return false;
+    await lireFlux(res, onEvent);
+    return true;
   },
 
   // ── Documents
@@ -155,6 +177,12 @@ export const api = {
   recherche: (q: string, texte?: string | null, date?: string | null) =>
     request<ResultatRecherche>("GET", url("/documents/recherche", { q, texte, date })),
   textes: () => request<TexteCorpus[]>("GET", "/textes"),
+
+  // ── BOFiP-Impôts
+  bofipDocument: (id: string) => request<VueBofip>("GET", `/bofip/documents/${enc(id)}`),
+  bofipPlan: (noeud?: string | null) => request<VueBofipNoeud>("GET", url("/bofip/plan", { noeud })),
+  bofipRecherche: (q: string, serie?: string | null) =>
+    request<ResultatRechercheBofip>("GET", url("/bofip/recherche", { q, serie })),
 
   // ── Divers
   health: () => request<Sante>("GET", "/health"),

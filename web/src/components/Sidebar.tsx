@@ -6,6 +6,7 @@ import {
   Moon,
   PenLine,
   Plus,
+  ScrollText,
   Settings2,
   Sun,
   Trash2,
@@ -27,6 +28,7 @@ type Props = {
   onRename: (id: string, title: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onBrowse: () => void;
+  onBrowseBofip: () => void;
   onSettings: () => void;
   onCloseMobile: () => void;
 };
@@ -60,6 +62,10 @@ export function Sidebar(p: Props) {
         <button className="side-action" onClick={p.onBrowse}>
           <BookOpenText size={16} />
           Parcourir les codes
+        </button>
+        <button className="side-action" onClick={p.onBrowseBofip}>
+          <ScrollText size={16} />
+          Doctrine BOFiP
         </button>
       </nav>
 
@@ -164,7 +170,15 @@ function ConvItem({
     <div className={`conv-item ${active ? "active" : ""}`}>
       <button className="conv-main" onClick={onSelect} title={conv.title || "Sans titre"}>
         <span className="conv-title">{conv.title || <em className="muted">Sans titre</em>}</span>
-        <span className="conv-date">{ilYA(conv.updated_at)}</span>
+        <span className="conv-date">
+          {conv.generation_en_cours ? (
+            <span className="conv-live" title="Réponse en cours de rédaction">
+              <span className="live-dot" aria-hidden /> rédige…
+            </span>
+          ) : (
+            ilYA(conv.updated_at)
+          )}
+        </span>
       </button>
       <div className="conv-tools">
         {confirming ? (

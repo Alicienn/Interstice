@@ -3,7 +3,16 @@
 // Les textes de loi ci-dessous sont des extraits abrégés, destinés uniquement à tester l'interface.
 
 import type {
+  ArticleCite,
   Conversation,
+  DoctrineArticle,
+  EnfantBofip,
+  FichierBofip,
+  LigneRechercheBofip,
+  MietteBofip,
+  RefBofip,
+  VueBofip,
+  VueBofipNoeud,
   DocRef,
   EnfantNoeud,
   Fournisseur,
@@ -24,7 +33,37 @@ import type {
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────────
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+// Pause manuelle des générations simulées (tests : « quitter pendant la rédaction »).
+// Dans la console : __intersticeMock.pauseApres(20) puis, plus tard, __intersticeMock.reprendre().
+let pauses = 0;
+let pauseA = Infinity;
+let porte: Promise<void> | null = null;
+let ouvrir: (() => void) | null = null;
+export const mockControl = {
+  /** Suspend les générations après `n` étapes supplémentaires. */
+  pauseApres(n = 0) {
+    pauseA = pauses + n;
+  },
+  reprendre() {
+    pauseA = Infinity;
+    ouvrir?.();
+    porte = null;
+    ouvrir = null;
+  },
+};
+if (typeof window !== "undefined") (window as unknown as { __intersticeMock: typeof mockControl }).__intersticeMock = mockControl;
+
+// Onglet masqué : les minuteries du navigateur sont bridées (≥ 1 s) ; la maquette ne temporise alors pas.
+const latence = (ms: number) =>
+  typeof document !== "undefined" && document.hidden ? Promise.resolve() : new Promise<void>((r) => setTimeout(r, ms));
+
+async function sleep(ms: number): Promise<void> {
+  pauses++;
+  if (pauses > pauseA && !porte) porte = new Promise<void>((r) => (ouvrir = r));
+  if (porte) await porte;
+  if (typeof document !== "undefined" && document.hidden) return;
+  await new Promise<void>((r) => setTimeout(r, ms));
+}
 const today = () => new Date().toISOString().slice(0, 10);
 let seq = 100;
 const newId = (prefix: string) => `${prefix}-${(seq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -343,6 +382,7 @@ function vueArticle(id: string, date: string | null): VueArticle | null {
     versions: art.versions,
     renvois_sortants: art.renvois_sortants,
     renvois_entrants: entrants,
+    doctrine: doctrineDe(art.id),
   };
 }
 
@@ -385,6 +425,325 @@ function rechercher(q: string, texte: string | null): LigneRecherche[] {
   return out;
 }
 
+// ─── BOFiP-Impôts (maquette) ─────────────────────────────────────────────────
+// Extraits rédigés pour la maquette, inspirés de la structure réelle des BOI (non officiels).
+
+type NoeudBofipMock = { noeud: string; parent: string | null; code: string | null; titre: string; pgp: string | null; origine: string };
+
+const planBofip: NoeudBofipMock[] = [];
+function nb(noeud: string, parent: string | null, titre: string, pgp: string | null = null, code: string | null = noeud) {
+  planBofip.push({ noeud, parent, code, titre, pgp, origine: "plan" });
+}
+nb("BOI-IR", null, "IR - Impôt sur le revenu");
+nb("BOI-RPPM", null, "RPPM - Revenus et profits du patrimoine mobilier");
+nb("BOI-BIC", null, "BIC - Bénéfices industriels et commerciaux");
+nb("BOI-TVA", null, "TVA - Taxe sur la valeur ajoutée");
+nb("BOI-CF", null, "CF - Contrôle fiscal");
+nb("BOI-RES", null, "RES - Rescrits");
+nb("@ACTU", null, "Actualités", null, null);
+nb("BOI-RPPM-RCM", "BOI-RPPM", "Revenus de capitaux mobiliers");
+nb("BOI-RPPM-PVBMI", "BOI-RPPM", "Plus-values sur biens meubles incorporels");
+nb("BOI-RPPM-PVBMI-10", "BOI-RPPM-PVBMI", "Champ d'application");
+nb("BOI-RPPM-PVBMI-30", "BOI-RPPM-PVBMI", "Régimes particuliers");
+nb("BOI-RPPM-PVBMI-30-10", "BOI-RPPM-PVBMI-30", "Sursis et reports d'imposition");
+nb(
+  "BOI-RPPM-PVBMI-30-10-60",
+  "BOI-RPPM-PVBMI-30-10",
+  "Report d'imposition des plus-values d'apport de titres à une société contrôlée par l'apporteur",
+  "5843-PGP",
+);
+nb("BOI-RPPM-PVBMI-30-10-60-10", "BOI-RPPM-PVBMI-30-10-60", "Champ d'application et conditions du report", "5844-PGP");
+nb("BOI-RPPM-PVBMI-30-10-60-20", "BOI-RPPM-PVBMI-30-10-60", "Événements mettant fin au report d'imposition", "5845-PGP");
+nb("BOI-CF-IOR", "BOI-CF", "Infractions et opérations répréhensibles");
+nb("BOI-CF-IOR-30", "BOI-CF-IOR", "Abus de droit fiscal");
+nb("BOI-CF-IOR-30-10", "BOI-CF-IOR-30", "Procédure de l'abus de droit fiscal", "7012-PGP");
+nb("@ACTU-2024-00045", "@ACTU", "RPPM - Report d'imposition de l'article 150-0 B ter - Aménagements", "9001-PGP", "ACTU-2024-00045");
+
+type DocBofipMock = {
+  pgp: string;
+  boi: string;
+  titre: string;
+  serie: string;
+  division: string | null;
+  nature: "Contenu" | "Actualité";
+  type_contenu: string | null;
+  date: string;
+  html: string;
+  articles: ArticleCite[];
+  sortantes: string[];
+  fichiers: FichierBofip[];
+  versions: { date: string; motif: string }[];
+};
+
+const cite = (code: string, num: string, texte_cid: string | null, article_id: string | null, occurrences: number): ArticleCite => ({
+  code,
+  num,
+  texte_cid,
+  article_id,
+  libelle: `${code}, art. ${num}`,
+  occurrences,
+});
+
+const para = (n: number, html: string) => `<p>${n}</p><p>${html}</p>`;
+
+const docsBofip: Record<string, DocBofipMock> = {};
+function db(d: DocBofipMock) {
+  docsBofip[d.pgp] = d;
+}
+
+db({
+  pgp: "5843-PGP",
+  boi: "BOI-RPPM-PVBMI-30-10-60-20240612",
+  titre:
+    "RPPM - Plus-values sur biens meubles incorporels - Régimes particuliers - Sursis et reports d'imposition - Report d'imposition des plus-values d'apport de titres à une société contrôlée par l'apporteur",
+  serie: "RPPM",
+  division: "PVBMI",
+  nature: "Contenu",
+  type_contenu: "Commentaire",
+  date: "2024-06-12",
+  html:
+    para(1, `L'<a data-article="${A_150_0_B_TER}">article 150-0 B ter du code général des impôts (CGI)</a> institue un report d'imposition obligatoire de la plus-value réalisée lors de l'apport de titres à une société soumise à l'impôt sur les sociétés que l'apporteur contrôle.`) +
+    para(10, `Le champ d'application et les conditions du report sont commentés au <a data-bofip="5844-PGP">BOI-RPPM-PVBMI-30-10-60-10</a> ; les événements qui y mettent fin, au <a data-bofip="5845-PGP">BOI-RPPM-PVBMI-30-10-60-20</a>.`),
+  articles: [cite("CGI", "150-0 B ter", CGI, A_150_0_B_TER, 2)],
+  sortantes: ["5844-PGP", "5845-PGP"],
+  fichiers: [],
+  versions: [],
+});
+
+db({
+  pgp: "5844-PGP",
+  boi: "BOI-RPPM-PVBMI-30-10-60-10-20240612",
+  titre:
+    "RPPM - Plus-values sur biens meubles incorporels - Régimes particuliers - Sursis et reports d'imposition - Report d'imposition des plus-values d'apport de titres à une société contrôlée par l'apporteur - Champ d'application et conditions du report",
+  serie: "RPPM",
+  division: "PVBMI",
+  nature: "Contenu",
+  type_contenu: "Commentaire",
+  date: "2024-06-12",
+  html:
+    `<h1 id="I_Champ">I. Champ d'application</h1>` +
+    `<h2>A. Personnes concernées</h2>` +
+    para(10, `Le report d'imposition prévu à l'<a data-article="${A_150_0_B_TER}">article 150-0 B ter du CGI</a> s'applique aux personnes physiques qui apportent, directement ou par personne interposée, des titres entrant dans le champ de l'<a data-article="${A_150_0_A}">article 150-0 A du CGI</a>.`) +
+    `<h2>B. Opérations concernées</h2>` +
+    para(20, `Sont visées les opérations d'échange ou d'apport de valeurs mobilières, de droits sociaux ou de titres assimilés, réalisées au profit d'une société soumise à l'impôt sur les sociétés.`) +
+    `<h1 id="II_Conditions">II. Conditions du report</h1>` +
+    `<h2>A. Condition de contrôle</h2>` +
+    para(30, `La société bénéficiaire de l'apport doit être contrôlée par l'apporteur. Le contrôle s'apprécie à la date de l'apport, en tenant compte des droits détenus à l'issue de celui-ci.`) +
+    `<table><thead><tr><th>Situation</th><th>Contrôle</th></tr></thead><tbody><tr><td>Majorité des droits de vote ou des droits financiers</td><td>Oui</td></tr><tr><td>Pouvoir de décision de fait</td><td>Oui</td></tr><tr><td>Détention de 33,33 % sans autre associé plus important</td><td>Présumé</td></tr></tbody></table>` +
+    `<h2>B. Lieu de l'apport</h2>` +
+    para(40, `L'apport doit être réalisé en France, dans un État membre de l'Union européenne ou dans un État ayant conclu avec la France une convention d'assistance administrative.`),
+  articles: [cite("CGI", "150-0 B ter", CGI, A_150_0_B_TER, 4), cite("CGI", "150-0 A", CGI, A_150_0_A, 1)],
+  sortantes: ["5843-PGP"],
+  fichiers: [],
+  versions: [{ date: "2019-04-10", motif: "Prise en compte de la loi de finances pour 2019" }],
+});
+
+db({
+  pgp: "5845-PGP",
+  boi: "BOI-RPPM-PVBMI-30-10-60-20-20240612",
+  titre:
+    "RPPM - Plus-values sur biens meubles incorporels - Régimes particuliers - Sursis et reports d'imposition - Report d'imposition des plus-values d'apport de titres à une société contrôlée par l'apporteur - Événements mettant fin au report d'imposition",
+  serie: "RPPM",
+  division: "PVBMI",
+  nature: "Contenu",
+  type_contenu: "Commentaire",
+  date: "2024-06-12",
+  html:
+    `<h1>I. Événements mettant fin au report</h1>` +
+    para(10, `En application du 1° du I de l'<a data-article="${A_150_0_B_TER}">article 150-0 B ter du CGI</a>, il est mis fin au report d'imposition lors de la cession à titre onéreux, du rachat, du remboursement ou de l'annulation des titres reçus en rémunération de l'apport.`) +
+    `<h2>A. Cession des titres reçus en rémunération de l'apport</h2>` +
+    para(20, `La plus-value en report est alors imposée au titre de l'année de l'événement, selon les règles en vigueur à la date de l'apport.`) +
+    `<h2>B. Cession des titres apportés dans les trois ans</h2>` +
+    para(30, `Lorsque la société bénéficiaire cède les titres apportés dans un délai de trois ans à compter de l'apport, le report est maintenu si elle s'engage à réinvestir, dans un délai de deux ans à compter de la cession, au moins 60 % du produit de cession dans une activité économique éligible.`) +
+    `<h3>1. Nature des réinvestissements éligibles</h3>` +
+    para(40, `Sont éligibles le financement de moyens permanents d'exploitation, l'acquisition d'une fraction du capital conférant le contrôle d'une société opérationnelle, ou la souscription au capital initial ou à l'augmentation de capital de sociétés opérationnelles. Voir aussi les conditions du report au <a data-bofip="5844-PGP" data-ancre="II_Conditions">BOI-RPPM-PVBMI-30-10-60-10, II</a>.`) +
+    `<h3>2. Délai de réinvestissement</h3>` +
+    para(50, `Le délai de deux ans court à compter de la date de la cession des titres apportés. L'engagement est joint à la déclaration ; un <a data-bofip-fichier="7788-PGP">modèle d'engagement de réinvestissement</a> est proposé en annexe.`) +
+    `<p><img data-bofip-image="7790-PGP" alt="Chronologie du report d'imposition"></p>` +
+    `<h1>II. Conséquences de la fin du report</h1>` +
+    para(60, `La plus-value est déterminée selon les règles de l'<a data-article="${A_150_0_D}">article 150-0 D du CGI</a> applicables à la date de l'apport.`) +
+    para(70, `L'administration peut remettre en cause, sur le fondement de l'<a data-article="${A_L64}">article L. 64 du livre des procédures fiscales</a>, les montages dont le but est exclusivement fiscal (voir <a data-bofip="7012-PGP">BOI-CF-IOR-30-10</a>).`),
+  articles: [
+    cite("CGI", "150-0 B ter", CGI, A_150_0_B_TER, 6),
+    cite("CGI", "150-0 D", CGI, A_150_0_D, 1),
+    cite("LPF", "L64", LPF, A_L64, 1),
+    cite("CGI", "170", CGI, null, 1),
+  ],
+  sortantes: ["5844-PGP", "7012-PGP", "8888-PGP"],
+  fichiers: [
+    { pgp: "7788-PGP", type: "requires", titre: "Modèle d'engagement de réinvestissement", mime: "application/pdf", taille: 48213, chemin: null },
+  ],
+  versions: [
+    { date: "2019-04-10", motif: "Prise en compte de la loi de finances pour 2019" },
+    { date: "2017-06-14", motif: "Publication initiale" },
+  ],
+});
+
+db({
+  pgp: "7012-PGP",
+  boi: "BOI-CF-IOR-30-10-20231220",
+  titre: "CF - Infractions et opérations répréhensibles - Abus de droit fiscal - Procédure de l'abus de droit fiscal",
+  serie: "CF",
+  division: "IOR",
+  nature: "Contenu",
+  type_contenu: "Commentaire",
+  date: "2023-12-20",
+  html:
+    `<h1>I. Définition de l'abus de droit</h1>` +
+    para(10, `L'<a data-article="${A_L64}">article L. 64 du livre des procédures fiscales (LPF)</a> permet à l'administration d'écarter les actes fictifs ou ceux qui, recherchant le bénéfice d'une application littérale des textes à l'encontre des objectifs poursuivis par leurs auteurs, n'ont pu être inspirés par aucun autre motif que celui d'éluder ou d'atténuer l'impôt.`) +
+    `<h1>II. Comité de l'abus de droit fiscal</h1>` +
+    para(20, `En cas de désaccord, le litige peut être soumis au comité de l'abus de droit fiscal, à la demande du contribuable ou de l'administration.`) +
+    `<h2>A. Saisine</h2>` +
+    para(30, `La saisine intervient dans un délai de trente jours à compter de la réponse de l'administration aux observations du contribuable.`) +
+    `<h2>B. Charge de la preuve</h2>` +
+    para(40, `Si l'administration ne s'est pas conformée à l'avis du comité, elle doit apporter la preuve du bien-fondé de la rectification.`),
+  articles: [cite("LPF", "L64", LPF, A_L64, 3)],
+  sortantes: [],
+  fichiers: [],
+  versions: [],
+});
+
+db({
+  pgp: "9001-PGP",
+  boi: "ACTU-2024-00045",
+  titre: "RPPM - Report d'imposition de l'article 150-0 B ter du CGI - Aménagements issus de la loi de finances pour 2024",
+  serie: "RPPM",
+  division: null,
+  nature: "Actualité",
+  type_contenu: null,
+  date: "2024-06-12",
+  html: `<p>La loi de finances pour 2024 aménage le régime du report d'imposition prévu à l'<a data-article="${A_150_0_B_TER}">article 150-0 B ter du CGI</a>. Les commentaires sont mis à jour au <a data-bofip="5845-PGP">BOI-RPPM-PVBMI-30-10-60-20</a>.</p>`,
+  articles: [cite("CGI", "150-0 B ter", CGI, A_150_0_B_TER, 2)],
+  sortantes: ["5845-PGP"],
+  fichiers: [],
+  versions: [],
+});
+
+function refBofip(pgp: string, type: string): RefBofip {
+  const d = docsBofip[pgp];
+  return d
+    ? { id: pgp, boi: d.boi, titre: d.titre, nature: d.nature, date: d.date, disponible: true, type, cible_type: d.nature }
+    : { id: pgp, boi: null, titre: null, nature: null, date: null, disponible: false, type, cible_type: "Contenu" };
+}
+
+function cheminPlan(pgp: string): MietteBofip[] {
+  const out: MietteBofip[] = [];
+  let n = planBofip.find((x) => x.pgp === pgp);
+  while (n) {
+    out.unshift({ id: n.pgp ?? n.noeud, noeud: n.noeud, code: n.code, titre: n.titre });
+    const parent: string | null = n.parent;
+    n = parent ? planBofip.find((x) => x.noeud === parent) : undefined;
+  }
+  return out;
+}
+
+function nbDocuments(noeud: string): number {
+  return planBofip.filter((x) => x.parent === noeud).reduce((acc, x) => acc + (x.pgp ? 1 : 0) + nbDocuments(x.noeud), 0);
+}
+
+function trouverDocBofip(ident: string): { d: DocBofipMock; version: { date: string; motif: string } | null } | null {
+  const [base, date] = ident.split("@");
+  const d = docsBofip[base!] ?? Object.values(docsBofip).find((x) => x.boi === base || x.boi.replace(/-\d{8}$/, "") === base);
+  if (!d) return null;
+  if (!date || date === d.date) return { d, version: null };
+  const v = d.versions.find((x) => x.date === date);
+  return v ? { d, version: v } : null;
+}
+
+function vueBofip(ident: string): VueBofip | null {
+  const t = trouverDocBofip(ident);
+  if (!t) return null;
+  const { d, version } = t;
+  const boiBase = d.boi.replace(/-\d{8}$/, "");
+  return {
+    id: version ? `${d.pgp}@${version.date}` : d.pgp,
+    pgp: d.pgp,
+    boi: version ? `${boiBase}-${version.date.replace(/-/g, "")}` : d.boi,
+    boi_base: boiBase,
+    titre: d.titre,
+    serie: d.serie,
+    division: d.division,
+    nature: d.nature,
+    type_contenu: d.type_contenu,
+    date: version ? version.date : d.date,
+    permalien: `https://bofip.impots.gouv.fr/bofip/${d.pgp}.html/${d.boi}`,
+    courant: version === null,
+    homonymes: [],
+    chemin: version ? [] : cheminPlan(d.pgp),
+    html: version
+      ? `<p><em>Version publiée le ${version.date} (${version.motif}) — texte simplifié pour la maquette.</em></p>${d.html}`
+      : d.html,
+    relations: {
+      sortantes: d.sortantes.map((p) => refBofip(p, "references")),
+      entrantes: Object.values(docsBofip)
+        .filter((x) => x.sortantes.includes(d.pgp))
+        .map((x) => refBofip(x.pgp, "isReferencedBy")),
+      fichiers: d.fichiers,
+    },
+    articles_cites: version ? [] : d.articles,
+    versions: d.versions.map((v) => ({
+      id: `${d.pgp}@${v.date}`,
+      boi: `${boiBase}-${v.date.replace(/-/g, "")}`,
+      date: v.date,
+      motif: v.motif,
+    })),
+  };
+}
+
+function vueBofipNoeud(noeud: string | null): VueBofipNoeud | null {
+  const racine = noeud ? planBofip.find((x) => x.noeud === noeud || x.code === noeud) : null;
+  if (noeud && !racine) return null;
+  const enfants: EnfantBofip[] = planBofip
+    .filter((x) => x.parent === (racine ? racine.noeud : null))
+    .map((x) => ({ noeud: x.noeud, id: x.pgp, code: x.code, titre: x.titre, origine: x.origine, nb_documents: nbDocuments(x.noeud) }));
+  return {
+    noeud: racine?.noeud ?? null,
+    id: racine?.pgp ?? null,
+    code: racine?.code ?? null,
+    titre: racine?.titre ?? "BOFiP-Impôts",
+    chemin: racine?.pgp ? cheminPlan(racine.pgp) : [],
+    enfants,
+  };
+}
+
+function rechercherBofip(q: string, serie: string | null): LigneRechercheBofip[] {
+  const mots = q
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((m) => m.length > 2);
+  if (mots.length === 0) return [];
+  return Object.values(docsBofip)
+    .filter((d) => !serie || d.serie === serie.toUpperCase())
+    .filter((d) => {
+      const low = `${d.titre} ${strip(d.html)}`.toLowerCase();
+      return mots.every((m) => low.includes(m));
+    })
+    .map((d) => {
+      const plain = strip(d.html);
+      const pos = Math.max(0, plain.toLowerCase().indexOf(mots[0]!));
+      const from = Math.max(0, pos - 80);
+      let ex = escapeHtml(plain.slice(from, from + 220));
+      for (const m of mots) ex = ex.replace(new RegExp(`(${m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"), "<mark>$1</mark>");
+      return { id: d.pgp, boi: d.boi, titre: d.titre, serie: d.serie, nature: d.nature, date: d.date, extrait_html: `${from > 0 ? "… " : ""}${ex} …` };
+    });
+}
+
+function doctrineDe(articleId: string): DoctrineArticle[] {
+  const art = versionIndex[articleId]?.art;
+  if (!art) return [];
+  return Object.values(docsBofip)
+    .map((d) => ({ d, c: d.articles.find((a) => a.article_id === art.id) }))
+    .filter((x): x is { d: DocBofipMock; c: ArticleCite } => x.c !== undefined)
+    .sort((a, b) => Number(a.d.nature === "Actualité") - Number(b.d.nature === "Actualité") || b.c.occurrences - a.c.occurrences)
+    .map(({ d, c }) => ({ id: d.pgp, boi: d.boi, titre: d.titre, nature: d.nature, date: d.date, occurrences: c.occurrences }));
+}
+
+const docBofip = (pgp: string): DocRef => {
+  const d = docsBofip[pgp]!;
+  const parts = d.titre.split(/\s+-\s+/);
+  return { kind: "bofip", id: pgp, titre: d.boi, sous_titre: parts[parts.length - 1] ?? d.titre, date: d.date };
+};
+
 // ─── Fournisseurs, modèles, réglages ─────────────────────────────────────────
 
 const TH_OFF: ThinkingSupport = { supported: false, levels: [], source: "heuristique" };
@@ -415,42 +774,113 @@ const providers: Fournisseur[] = [
 
 let settings: Reglages = { default_model_key: "anthropic::claude-opus-4-5", default_thinking: "medium" };
 
-function remoteCatalogue(p: Fournisseur): Omit<ModeleDistant, "enabled">[] {
+const TH_CAT_OPENAI: ThinkingSupport = { supported: true, levels: ["minimal", "low", "medium", "high"], source: "catalogue" };
+const TH_CAT_CLAUDE: ThinkingSupport = { supported: true, levels: ["low", "medium", "high", "xhigh", "max"], source: "catalogue" };
+
+type Distant = Omit<ModeleDistant, "enabled">;
+
+function remoteCatalogue(p: Fournisseur): Distant[] {
   if (p.type === "anthropic") {
     return [
-      { id: "claude-opus-4-5", owned_by: "anthropic", context_length: 200000, thinking: TH_CLAUDE },
-      { id: "claude-sonnet-4-5", owned_by: "anthropic", context_length: 1000000, thinking: TH_CLAUDE },
-      { id: "claude-haiku-4-5", owned_by: "anthropic", context_length: 200000, thinking: { ...TH_CLAUDE, levels: ["low", "medium", "high"] } },
-      { id: "claude-3-5-haiku-latest", owned_by: "anthropic", context_length: 200000, thinking: { ...TH_OFF, source: "api" } },
+      { id: "claude-opus-4-5", label: "Claude Opus 4.5", owned_by: "anthropic", context_length: 200000, max_output: 64000, thinking: TH_CLAUDE, origine: "api+catalogue" },
+      { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", owned_by: "anthropic", context_length: 1000000, max_output: 64000, thinking: TH_CAT_CLAUDE, origine: "api+catalogue" },
+      { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", owned_by: "anthropic", context_length: 200000, max_output: 64000, thinking: { ...TH_CAT_CLAUDE, levels: ["low", "medium", "high"] }, origine: "api+catalogue" },
+      { id: "claude-3-5-haiku-latest", label: "Claude Haiku 3.5", owned_by: "anthropic", context_length: 200000, max_output: 8192, thinking: { ...TH_OFF, source: "catalogue" }, origine: "api+catalogue" },
+      { id: "claude-opus-4-1", label: "Claude Opus 4.1", owned_by: "anthropic", context_length: 200000, max_output: 32000, thinking: TH_CAT_CLAUDE, origine: "catalogue" },
     ];
   }
-  const base: [string, string, number | null, ThinkingSupport][] = [
-    ["openai/gpt-5", "openai", 400000, { ...TH_OPENAI, source: "api" }],
-    ["openai/gpt-5-mini", "openai", 400000, { ...TH_OPENAI, source: "api" }],
-    ["openai/gpt-5-nano", "openai", 400000, { ...TH_OPENAI, source: "api" }],
-    ["openai/o3", "openai", 200000, { ...TH_OPENAI, source: "api" }],
-    ["openai/o4-mini", "openai", 200000, { ...TH_OPENAI, source: "api" }],
-    ["openai/gpt-4.1", "openai", 1047576, TH_OFF],
-    ["openai/gpt-4.1-mini", "openai", 1047576, TH_OFF],
-    ["openai/gpt-4o", "openai", 128000, TH_OFF],
-    ["anthropic/claude-opus-4.5", "anthropic", 200000, { ...TH_CLAUDE, source: "api" }],
-    ["anthropic/claude-sonnet-4.5", "anthropic", 1000000, { ...TH_CLAUDE, source: "api" }],
-    ["anthropic/claude-haiku-4.5", "anthropic", 200000, TH_OPENAI],
-    ["google/gemini-2.5-pro", "google", 1048576, TH_OPENAI],
-    ["google/gemini-2.5-flash", "google", 1048576, TH_OPENAI],
-    ["deepseek/deepseek-v3.2", "deepseek", 128000, TH_OFF],
-    ["deepseek/deepseek-r1", "deepseek", 128000, { supported: true, levels: [], source: "heuristique" }],
-    ["mistralai/mistral-large-2411", "mistralai", 128000, TH_OFF],
-    ["mistralai/magistral-medium", "mistralai", 40000, { supported: true, levels: [], source: "heuristique" }],
-    ["mistralai/mistral-small-3.2", "mistralai", 128000, TH_OFF],
-    ["qwen/qwen3-235b-a22b", "qwen", 131072, { ...TH_OPENAI, levels: ["low", "high"] }],
-    ["qwen/qwen3-coder", "qwen", 262144, TH_OFF],
-    ["meta-llama/llama-4-maverick", "meta-llama", 1048576, TH_OFF],
-    ["x-ai/grok-4", "x-ai", 256000, TH_OPENAI],
-    ["moonshotai/kimi-k2", "moonshotai", 131072, TH_OFF],
-    ["z-ai/glm-4.6", "z-ai", 200000, TH_OPENAI],
+  // Fournisseur « compatible OpenAI » (OpenRouter) : quelques centaines de modèles, comme en réalité.
+  const connus: Distant[] = [
+    { id: "openai/gpt-5", label: "OpenAI: GPT-5", owned_by: "openai", context_length: 400000, max_output: 128000, thinking: TH_CAT_OPENAI, origine: "api+catalogue" },
+    { id: "openai/gpt-5-mini", label: "OpenAI: GPT-5 Mini", owned_by: "openai", context_length: 400000, max_output: 128000, thinking: TH_CAT_OPENAI, origine: "api+catalogue" },
+    { id: "openai/gpt-5-nano", label: "OpenAI: GPT-5 Nano", owned_by: "openai", context_length: 400000, max_output: 128000, thinking: TH_CAT_OPENAI, origine: "api+catalogue" },
+    { id: "openai/o3", label: "OpenAI: o3", owned_by: "openai", context_length: 200000, max_output: 100000, thinking: { ...TH_OPENAI, source: "catalogue" }, origine: "api+catalogue" },
+    { id: "openai/gpt-4.1", label: "OpenAI: GPT-4.1", owned_by: "openai", context_length: 1047576, max_output: 32768, thinking: { ...TH_OFF, source: "catalogue" }, origine: "api+catalogue" },
+    { id: "anthropic/claude-opus-4.5", label: "Anthropic: Claude Opus 4.5", owned_by: "anthropic", context_length: 200000, max_output: 64000, thinking: TH_CAT_CLAUDE, origine: "api+catalogue" },
+    { id: "anthropic/claude-sonnet-4.5", label: "Anthropic: Claude Sonnet 4.5", owned_by: "anthropic", context_length: 1000000, max_output: 64000, thinking: TH_CAT_CLAUDE, origine: "api+catalogue" },
+    { id: "google/gemini-2.5-pro", label: "Google: Gemini 2.5 Pro", owned_by: "google", context_length: 1048576, max_output: 65536, thinking: { ...TH_OPENAI, source: "catalogue" }, origine: "api+catalogue" },
+    { id: "deepseek/deepseek-v3.2", label: "DeepSeek: V3.2", owned_by: "deepseek", context_length: 128000, max_output: 8192, thinking: TH_OFF, origine: "api+catalogue" },
+    { id: "deepseek/deepseek-r1", label: "DeepSeek: R1", owned_by: "deepseek", context_length: 128000, max_output: 32768, thinking: { supported: true, levels: [], source: "catalogue" }, origine: "api+catalogue" },
+    { id: "mistralai/mistral-large-2411", label: "Mistral: Large 2411", owned_by: "mistralai", context_length: 128000, max_output: null, thinking: TH_OFF, origine: "api+catalogue" },
+    { id: "openai/gpt-5-pro", label: "OpenAI: GPT-5 Pro", owned_by: "openai", context_length: 400000, max_output: 272000, thinking: { supported: true, levels: ["high"], source: "catalogue" }, origine: "catalogue" },
+    { id: "x-ai/grok-4-heavy", label: "xAI: Grok 4 Heavy", owned_by: "x-ai", context_length: 256000, max_output: null, thinking: { ...TH_OPENAI, source: "catalogue" }, origine: "catalogue" },
   ];
-  return base.map(([id, owned_by, context_length, thinking]) => ({ id, owned_by, context_length, thinking }));
+  // Génère une longue traîne réaliste (fournisseurs × familles × variantes).
+  const familles: [string, string, string[]][] = [
+    ["meta-llama", "Meta", ["llama-3.1-8b-instruct", "llama-3.1-70b-instruct", "llama-3.1-405b-instruct", "llama-3.2-1b-instruct", "llama-3.2-3b-instruct", "llama-3.2-11b-vision-instruct", "llama-3.2-90b-vision-instruct", "llama-3.3-70b-instruct", "llama-4-scout", "llama-4-maverick", "llama-guard-3-8b", "llama-guard-4-12b"]],
+    ["qwen", "Qwen", ["qwen-2.5-7b-instruct", "qwen-2.5-72b-instruct", "qwen-2.5-coder-32b-instruct", "qwen-2.5-vl-72b-instruct", "qwen3-8b", "qwen3-14b", "qwen3-30b-a3b", "qwen3-32b", "qwen3-235b-a22b", "qwen3-coder", "qwen3-max", "qwq-32b", "qwen-plus", "qwen-turbo", "qwen-max"]],
+    ["mistralai", "Mistral", ["mistral-7b-instruct", "mistral-nemo", "mistral-small-3.1-24b-instruct", "mistral-small-3.2-24b-instruct", "mistral-medium-3", "mistral-medium-3.1", "codestral-2508", "devstral-small", "devstral-medium", "magistral-small-2506", "magistral-medium-2506", "ministral-3b", "ministral-8b", "pixtral-large-2411", "mixtral-8x7b-instruct", "mixtral-8x22b-instruct"]],
+    ["google", "Google", ["gemini-2.0-flash-001", "gemini-2.0-flash-lite-001", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash-image", "gemma-2-9b-it", "gemma-2-27b-it", "gemma-3-4b-it", "gemma-3-12b-it", "gemma-3-27b-it", "gemma-3n-e4b-it"]],
+    ["openai", "OpenAI", ["gpt-4o", "gpt-4o-mini", "gpt-4o-2024-11-20", "gpt-4.1-mini", "gpt-4.1-nano", "o1", "o1-mini", "o3-mini", "o3-pro", "o4-mini", "o4-mini-high", "gpt-oss-20b", "gpt-oss-120b", "chatgpt-4o-latest", "gpt-3.5-turbo", "gpt-4-turbo", "codex-mini"]],
+    ["anthropic", "Anthropic", ["claude-3-haiku", "claude-3.5-haiku", "claude-3.5-sonnet", "claude-3.7-sonnet", "claude-3.7-sonnet:thinking", "claude-sonnet-4", "claude-opus-4", "claude-opus-4.1", "claude-haiku-4.5"]],
+    ["x-ai", "xAI", ["grok-3", "grok-3-mini", "grok-4", "grok-4-fast", "grok-code-fast-1", "grok-2-vision-1212"]],
+    ["deepseek", "DeepSeek", ["deepseek-chat", "deepseek-chat-v3-0324", "deepseek-chat-v3.1", "deepseek-r1-0528", "deepseek-r1-distill-llama-70b", "deepseek-r1-distill-qwen-32b", "deepseek-prover-v2"]],
+    ["cohere", "Cohere", ["command-r", "command-r-plus", "command-r7b-12-2024", "command-a"]],
+    ["microsoft", "Microsoft", ["phi-3-mini-128k-instruct", "phi-3-medium-128k-instruct", "phi-4", "phi-4-reasoning-plus", "phi-4-multimodal-instruct", "wizardlm-2-8x22b", "mai-ds-r1"]],
+    ["nvidia", "NVIDIA", ["llama-3.1-nemotron-70b-instruct", "llama-3.3-nemotron-super-49b-v1", "nemotron-nano-9b-v2"]],
+    ["amazon", "Amazon", ["nova-micro-v1", "nova-lite-v1", "nova-pro-v1", "nova-premier-v1"]],
+    ["moonshotai", "MoonshotAI", ["kimi-k2", "kimi-k2-0905", "kimi-dev-72b", "kimi-vl-a3b-thinking"]],
+    ["z-ai", "Z.AI", ["glm-4.5", "glm-4.5-air", "glm-4.5v", "glm-4.6", "glm-4-32b"]],
+    ["perplexity", "Perplexity", ["sonar", "sonar-pro", "sonar-reasoning", "sonar-reasoning-pro", "sonar-deep-research", "r1-1776"]],
+    ["nousresearch", "Nous", ["hermes-3-llama-3.1-70b", "hermes-3-llama-3.1-405b", "hermes-4-70b", "hermes-4-405b", "deephermes-3-mistral-24b-preview"]],
+    ["ai21", "AI21", ["jamba-large-1.7", "jamba-mini-1.7"]],
+    ["inception", "Inception", ["mercury", "mercury-coder"]],
+    ["minimax", "MiniMax", ["minimax-01", "minimax-m1", "minimax-m2"]],
+    ["baidu", "Baidu", ["ernie-4.5-21b-a3b", "ernie-4.5-300b-a47b", "ernie-4.5-vl-424b-a47b"]],
+    ["tencent", "Tencent", ["hunyuan-a13b-instruct"]],
+    ["liquid", "Liquid", ["lfm-3b", "lfm-7b", "lfm-40b"]],
+    ["thedrummer", "TheDrummer", ["anubis-70b-v1.1", "cydonia-24b-v4.1", "rocinante-12b", "unslopnemo-12b", "skyfall-36b-v2"]],
+    ["sao10k", "Sao10K", ["l3-lunaris-8b", "l3.1-euryale-70b", "l3.3-euryale-70b", "l3-euryale-70b"]],
+    ["arcee-ai", "Arcee AI", ["coder-large", "maestro-reasoning", "spotlight", "virtuoso-large", "afm-4.5b"]],
+    ["ibm-granite", "IBM", ["granite-4.0-h-micro", "granite-3.3-8b-instruct"]],
+    ["bytedance", "ByteDance", ["seed-oss-36b-instruct", "ui-tars-1.5-7b"]],
+    ["alibaba", "Alibaba", ["tongyi-deepresearch-30b-a3b"]],
+    ["stepfun-ai", "StepFun", ["step3"]],
+    ["thudm", "THUDM", ["glm-4.1v-9b-thinking", "glm-z1-32b"]],
+  ];
+  const connusIds = new Set(connus.map((c) => c.id));
+  const genere: Distant[] = [];
+  let i = 0;
+  for (const [vendor, nom, modeles] of familles) {
+    for (const m of modeles) {
+      for (const suffixe of ["", ":free"]) {
+        if (suffixe && i % 3 !== 0) continue; // quelques variantes gratuites seulement
+        const id = `${vendor}/${m}${suffixe}`;
+        i++;
+        if (connusIds.has(id)) continue;
+        const raisonne = /r1|reason|think|o[134]|qwq|magistral|grok-[34]|gpt-5|glm-4\.[56]|claude-(3\.7|sonnet-4|opus-4)|gemini-2\.5|kimi-k2|minimax-m|qwen3|sonar-reasoning|phi-4-reasoning|deepseek-chat-v3\.1|gpt-oss/.test(m);
+        const avecCatalogue = i % 7 !== 0;
+        const origine: Distant["origine"] = i % 23 === 0 ? "catalogue" : avecCatalogue ? "api+catalogue" : "api";
+        const thinking: ThinkingSupport = raisonne
+          ? avecCatalogue
+            ? { supported: true, levels: /o[134]|gpt|grok/.test(m) ? ["low", "medium", "high"] : [], source: "catalogue" }
+            : { ...TH_OPENAI, source: "heuristique" }
+          : { supported: false, levels: [], source: avecCatalogue ? "catalogue" : "heuristique" };
+        const ctx = [8192, 32768, 65536, 128000, 131072, 163840, 200000, 262144, 1048576][i % 9]!;
+        genere.push({
+          id,
+          label: avecCatalogue || origine === "catalogue" ? `${nom}: ${m.replace(/-/g, " ").replace(/:free$/, "")}${suffixe ? " (free)" : ""}` : null,
+          owned_by: vendor,
+          context_length: ctx,
+          max_output: avecCatalogue ? Math.min(ctx, [4096, 8192, 16384, 32768, 65536][i % 5]!) : null,
+          thinking,
+          origine,
+        });
+      }
+    }
+  }
+  // Multiplie les variantes datées pour atteindre un volume réaliste (~400).
+  const dates = ["-2024-08-06", "-2024-11-20", "-2025-03-01", "-2025-06-15"];
+  const extra: Distant[] = [];
+  for (const g of genere) {
+    if (extra.length + genere.length + connus.length >= 400) break;
+    if (g.id.endsWith(":free")) continue;
+    for (const d of dates) {
+      if (extra.length + genere.length + connus.length >= 400) break;
+      if ((g.id.length + d.length) % 3 === 0) extra.push({ ...g, id: `${g.id}${d}`, label: g.label ? `${g.label} (${d.slice(1)})` : null, origine: "api" });
+    }
+  }
+  return [...connus, ...genere, ...extra].sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function modelesChoix(): ModeleChoix[] {
@@ -496,7 +926,7 @@ const conversations: Conversation[] = [
         created_at: ago(43),
         model_key: "anthropic::claude-opus-4-5",
         thinking_level: "medium",
-        usage: { input_tokens: 18230, output_tokens: 412, cache_read_tokens: 15020 },
+        usage: { input_tokens: 18230, output_tokens: 412, cache_read_tokens: 15020, duree_ms: 72_000 },
         parts: [
           { type: "thinking", text: "La question porte sur le 2° du I de l'article 150-0 B ter. Je lis l'article en vigueur." },
           {
@@ -520,10 +950,62 @@ const conversations: Conversation[] = [
   { id: "conv-vide", title: "Abus de droit : critère du but exclusivement fiscal", updated_at: ago(60 * 26), messages: [] },
 ];
 
-const running = new Map<string, { stopped: boolean }>();
+// Générations « côté serveur » : elles continuent quand le client ferme le flux (changement de
+// conversation, rechargement) ; seul /stop (ou la suppression) les arrête. Un client peut s'y
+// rattacher via GET /conversations/{id}/stream (rejeu depuis le début, puis direct).
+type EvenementSSE = { event: string; data: unknown };
+type Generation = {
+  messageId: string;
+  events: EvenementSSE[];
+  done: boolean;
+  stopped: boolean;
+  subs: Set<(e: EvenementSSE | null) => void>;
+};
+const generations = new Map<string, Generation>();
 
 function resume(c: Conversation) {
-  return { id: c.id, title: c.title, updated_at: c.updated_at };
+  return { id: c.id, title: c.title, updated_at: c.updated_at, generation_en_cours: generations.has(c.id) };
+}
+
+function vueConversation(c: Conversation): Conversation {
+  const g = generations.get(c.id);
+  return {
+    ...c,
+    messages: structuredClone(c.messages),
+    generation_en_cours: !!g,
+    generation_message_id: g?.messageId ?? null,
+  };
+}
+
+/** Flux SSE d'une génération : rejoue les événements passés puis suit le direct. */
+function abonner(gen: Generation, signal?: AbortSignal | null): Response {
+  const encoder = new TextEncoder();
+  let sub: ((e: EvenementSSE | null) => void) | null = null;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const enc = (e: EvenementSSE) => encoder.encode(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`);
+      for (const e of gen.events) controller.enqueue(enc(e));
+      if (gen.done) {
+        controller.close();
+        return;
+      }
+      sub = (e) => {
+        if (e === null) {
+          gen.subs.delete(sub!);
+          controller.close();
+        } else controller.enqueue(enc(e));
+      };
+      gen.subs.add(sub);
+      // Comme un vrai fetch : l'abandon côté client fait échouer la lecture… sans arrêter la génération.
+      signal?.addEventListener("abort", () => {
+        if (sub && gen.subs.delete(sub)) controller.error(new DOMException("Lecture interrompue", "AbortError"));
+      });
+    },
+    cancel() {
+      if (sub) gen.subs.delete(sub);
+    },
+  });
+  return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
 function titreDepuis(texte: string): string {
@@ -561,6 +1043,10 @@ Le report d'imposition de l'article **150-0 B ter** s'applique automatiquement l
 2. Les gains relèvent du champ de l'article **150-0 A** ; l'assiette suit l'article 150-0 D.
 3. Un montage dont le but serait *exclusivement* fiscal reste exposé à la procédure d'**abus de droit** (LPF, art. L. 64).
 
+## Doctrine administrative
+
+Le BOFiP (\`BOI-RPPM-PVBMI-30-10-60-20\`, § 30 à 50) reprend ces conditions : le délai de deux ans court **à compter de la cession** des titres apportés, et l'engagement de réinvestissement est joint à la déclaration.
+
 > Les références sont cliquables ci-dessus : ouvrez-les dans le panneau de lecture pour vérifier le texte exact et ses versions.
 `;
 
@@ -575,12 +1061,7 @@ function chunks(text: string, size: number): string[] {
   return out;
 }
 
-function streamReponse(conv: Conversation, content: string, model_key: string, thinking_level: string | null, signal?: AbortSignal | null): Response {
-  const encoder = new TextEncoder();
-  const state = { stopped: false };
-  running.set(conv.id, state);
-  let cancelled = false;
-
+function demarrerGeneration(conv: Conversation, content: string, model_key: string, thinking_level: string | null): Generation {
   const userMsg: Message = {
     id: newId("m"),
     role: "user",
@@ -606,21 +1087,17 @@ function streamReponse(conv: Conversation, content: string, model_key: string, t
     else parts.push({ type, text });
   };
 
-  const body = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (event: string, data: unknown) => {
-        if (cancelled) return;
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-      };
-      const alive = () => !cancelled && !state.stopped && !signal?.aborted;
-      // Comme un vrai fetch : l'abandon côté client fait échouer la lecture du corps.
-      signal?.addEventListener("abort", () => {
-        if (cancelled) return;
-        cancelled = true;
-        state.stopped = true;
-        controller.error(new DOMException("Lecture interrompue", "AbortError"));
-      });
+  const debut = Date.now();
+  const gen: Generation = { messageId: assistant.id, events: [], done: false, stopped: false, subs: new Set() };
+  generations.set(conv.id, gen);
+  const send = (event: string, data: unknown) => {
+    const e = { event, data: structuredClone(data) };
+    gen.events.push(e);
+    for (const sub of [...gen.subs]) sub(e);
+  };
+  const alive = () => !gen.stopped;
 
+  void (async () => {
       send("user_message", userMsg);
       await sleep(250);
       conv.messages.push(assistant);
@@ -662,6 +1139,14 @@ function streamReponse(conv: Conversation, content: string, model_key: string, t
           throw new Error("erreur simulée");
         }
 
+        // Texte intermédiaire entre deux outils (va dans le journal une fois la réponse terminée)
+        for (const piece of chunks("Le sommaire situe l'article dans le régime des plus-values mobilières ; je lis maintenant les textes.", 10)) {
+          if (!alive()) throw new Error("stop");
+          addDelta("text", piece);
+          send("text_delta", { text: piece });
+          await sleep(25);
+        }
+
         // Outil 2 : lire_article (×2, en parallèle)
         const call2 = newId("call");
         const call3 = newId("call");
@@ -695,6 +1180,27 @@ function streamReponse(conv: Conversation, content: string, model_key: string, t
         Object.assign(parts[parts.length - 1]!, { status: "done", summary: "1 résultat", documents: docs4 });
         send("tool_result", { call_id: call4, status: "done", summary: "1 résultat", documents: docs4 });
 
+        // Outils 4 et 5 : doctrine administrative (BOFiP)
+        const call5 = newId("call");
+        const args5 = { texte: "CGI", num: "150-0 B ter" };
+        parts.push({ type: "tool", call_id: call5, name: "bofip_pour_article", arguments: args5, status: "running", documents: [] });
+        send("tool_call", { call_id: call5, name: "bofip_pour_article", arguments: args5 });
+        await sleep(650);
+        if (!alive()) throw new Error("stop");
+        const docs5 = ["5845-PGP", "5844-PGP", "5843-PGP", "9001-PGP"].map((p) => docBofip(p));
+        Object.assign(parts[parts.length - 1]!, { status: "done", summary: "4 documents", documents: docs5 });
+        send("tool_result", { call_id: call5, status: "done", summary: "4 documents", documents: docs5 });
+
+        const call6 = newId("call");
+        const args6 = { id: "BOI-RPPM-PVBMI-30-10-60-20", paragraphe: 30 };
+        parts.push({ type: "tool", call_id: call6, name: "bofip_lire", arguments: args6, status: "running", documents: [] });
+        send("tool_call", { call_id: call6, name: "bofip_lire", arguments: args6 });
+        await sleep(500);
+        if (!alive()) throw new Error("stop");
+        const docs6 = [docBofip("5845-PGP")];
+        Object.assign(parts[parts.length - 1]!, { status: "done", summary: "§ 30 à 50", documents: docs6 });
+        send("tool_result", { call_id: call6, status: "done", summary: "§ 30 à 50", documents: docs6 });
+
         if (thinking_level) {
           const t = "\n\nLes textes confirment le délai de 3 ans et le réinvestissement de 60 % sous 2 ans. Je rédige.";
           for (const piece of chunks(t, 14)) {
@@ -713,21 +1219,16 @@ function streamReponse(conv: Conversation, content: string, model_key: string, t
       } catch {
         /* arrêt ou erreur simulée : on termine proprement */
       }
-      const usage = { input_tokens: 21480, output_tokens: 1260, cache_read_tokens: 17950 };
+      const usage = { input_tokens: 21480, output_tokens: 1260, cache_read_tokens: 17950, duree_ms: Date.now() - debut };
       assistant.usage = usage;
       for (const p of parts) if (p.type === "tool" && p.status === "running") Object.assign(p, { status: "error", summary: "Interrompu" });
       send("message_end", { message_id: assistant.id, usage });
       conv.updated_at = new Date().toISOString();
-      running.delete(conv.id);
-      if (!cancelled) controller.close();
-    },
-    cancel() {
-      cancelled = true;
-      state.stopped = true;
-    },
-  });
-
-  return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+      gen.done = true;
+      if (generations.get(conv.id) === gen) generations.delete(conv.id);
+      for (const sub of [...gen.subs]) sub(null);
+  })();
+  return gen;
 }
 
 // ─── Routeur ─────────────────────────────────────────────────────────────────
@@ -743,7 +1244,7 @@ export async function mockFetch(input: string, init?: RequestInit): Promise<Resp
   const method = (init?.method ?? "GET").toUpperCase();
   const q = u.searchParams;
   const seg = path.split("/").filter(Boolean).map(decodeURIComponent);
-  await sleep(120 + Math.random() * 180);
+  await latence(120 + Math.random() * 180);
 
   // /providers
   if (seg[0] === "providers") {
@@ -777,7 +1278,7 @@ export async function mockFetch(input: string, init?: RequestInit): Promise<Resp
       return noContent();
     }
     if (seg[2] === "remote-models" && method === "GET") {
-      await sleep(600);
+      await latence(600);
       if (/erreur|invalid/i.test(p.base_url))
         return json({ detail: `Le fournisseur a répondu 401 Unauthorized sur ${p.base_url}/models` }, 502);
       const enabled = new Set(p.models.map((m) => m.id));
@@ -809,11 +1310,11 @@ export async function mockFetch(input: string, init?: RequestInit): Promise<Resp
       const b = await readBody<{ title?: string }>(init);
       const c: Conversation = { id: newId("conv"), title: b.title ?? "", updated_at: new Date().toISOString(), messages: [] };
       conversations.push(c);
-      return json(c);
+      return json(vueConversation(c));
     }
     const c = conversations.find((x) => x.id === seg[1]);
     if (!c) return notFound("Conversation introuvable");
-    if (seg.length === 2 && method === "GET") return json(c);
+    if (seg.length === 2 && method === "GET") return json(vueConversation(c));
     if (seg.length === 2 && method === "PATCH") {
       const b = await readBody<{ title: string }>(init);
       c.title = b.title;
@@ -821,12 +1322,14 @@ export async function mockFetch(input: string, init?: RequestInit): Promise<Resp
       return json(resume(c));
     }
     if (seg.length === 2 && method === "DELETE") {
+      const g = generations.get(c.id);
+      if (g) g.stopped = true;
       conversations.splice(conversations.indexOf(c), 1);
       return noContent();
     }
     if (seg[2] === "stop" && method === "POST") {
-      const r = running.get(c.id);
-      if (r) r.stopped = true;
+      const g = generations.get(c.id);
+      if (g) g.stopped = true;
       return noContent();
     }
     if (seg[2] === "messages" && method === "POST") {
@@ -834,7 +1337,12 @@ export async function mockFetch(input: string, init?: RequestInit): Promise<Resp
       if (!b.content?.trim()) return json({ detail: "Message vide" }, 422);
       if (!modelesChoix().some((m) => m.key === b.model_key))
         return json({ detail: `Modèle inconnu : ${b.model_key}` }, 400);
-      return streamReponse(c, b.content, b.model_key, b.thinking_level, init?.signal);
+      if (generations.has(c.id)) return json({ detail: "Une génération est déjà en cours pour cette conversation" }, 409);
+      return abonner(demarrerGeneration(c, b.content, b.model_key, b.thinking_level), init?.signal);
+    }
+    if (seg[2] === "stream" && method === "GET") {
+      const g = generations.get(c.id);
+      return g ? abonner(g, init?.signal) : noContent();
     }
   }
 
@@ -853,6 +1361,22 @@ export async function mockFetch(input: string, init?: RequestInit): Promise<Resp
       const texteParam = q.get("texte");
       const cid = texteParam ? (textes.find((t) => t.cid === texteParam || t.sigle === texteParam)?.cid ?? texteParam) : null;
       return json({ resultats: rechercher(q.get("q") ?? "", cid) });
+    }
+  }
+
+  if (seg[0] === "bofip") {
+    if (seg[1] === "documents" && seg[2]) {
+      const v = vueBofip(seg[2]);
+      return v ? json(v) : notFound(`document BOFiP introuvable : « ${seg[2]} »`);
+    }
+    if (seg[1] === "plan") {
+      const v = vueBofipNoeud(q.get("noeud") || null);
+      return v ? json(v) : notFound("Nœud du plan introuvable");
+    }
+    if (seg[1] === "recherche") {
+      const qq = q.get("q") ?? "";
+      if (!qq.trim()) return json({ detail: "Paramètre q obligatoire" }, 422);
+      return json({ resultats: rechercherBofip(qq, q.get("serie")) });
     }
   }
 

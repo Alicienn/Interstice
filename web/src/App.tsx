@@ -50,6 +50,15 @@ export default function App() {
     void refreshModels();
   }, [refreshConversations, refreshModels]);
 
+  // Tant qu'une génération tourne en arrière-plan, la liste est rafraîchie régulièrement
+  // (indicateur « rédige… », titre, ordre) ; elle l'est aussi à la fin de chaque flux suivi.
+  const enCours = conversations?.some((c) => c.generation_en_cours) ?? false;
+  useEffect(() => {
+    if (!enCours) return;
+    const t = setInterval(() => void refreshConversations(), 5000);
+    return () => clearInterval(t);
+  }, [enCours, refreshConversations]);
+
   const openTarget = useCallback((t: ReaderTarget) => {
     setReader((h) => pushTarget(h, t));
     setReaderOpen(true);
@@ -90,6 +99,10 @@ export default function App() {
         onDelete={deleteConversation}
         onBrowse={() => {
           openTarget({ kind: "textes" });
+          setSidebarOpen(false);
+        }}
+        onBrowseBofip={() => {
+          openTarget({ kind: "bofip-plan", noeud: null });
           setSidebarOpen(false);
         }}
         onSettings={() => {

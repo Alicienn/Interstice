@@ -4,6 +4,7 @@ import {
   chatReducer,
   initialChatState,
   INTERRUPTED_SUMMARY,
+  stripGeneration,
   toStreamEvent,
   type ChatState,
 } from "./chatReducer";
@@ -133,6 +134,84 @@ describe("chatReducer", () => {
   it("load réinitialise l'état", () => {
     const s = chatReducer(sent(), { type: "load", messages: [userMsg] });
     expect(s).toEqual({ ...initialChatState, messages: [userMsg] });
+  });
+});
+
+describe("rattachement à une génération en arrière-plan (GET /stream)", () => {
+  const u0: Message = { id: "u0", role: "user", parts: [{ type: "text", text: "Première question" }], created_at: NOW };
+  const a0: Message = { id: "a0", role: "assistant", parts: [{ type: "text", text: "Première réponse." }], created_at: NOW };
+  const u1: Message = { id: "u1", role: "user", parts: [{ type: "text", text: "Seconde question" }], created_at: NOW };
+  const a1Partiel: Message = {
+    id: "a1",
+    role: "assistant",
+    parts: [
+      { type: "thinking", text: "Je lis" },
+      { type: "text", text: "Le report" },
+    ],
+    created_at: NOW,
+  };
+  const replay: StreamEvent[] = [
+    { event: "user_message", data: u1 },
+    { event: "message_start", data: { message_id: "a1", model_key: "p::m", thinking_level: "low" } },
+    { event: "thinking_delta", data: { text: "Je lis" } },
+    { event: "tool_call", data: { call_id: "c1", name: "lire_article", arguments: { num: "150-0 B ter" } } },
+    { event: "tool_result", data: { call_id: "c1", status: "done", summary: "ok", documents: [] } },
+    { event: "text_delta", data: { text: "Le report" } },
+  ];
+
+  it("stripGeneration retire le message partiel et la question qui le précède", () => {
+    expect(stripGeneration([u0, a0, u1, a1Partiel], "a1").map((m) => m.id)).toEqual(["u0", "a0"]);
+    // Message assistant pas encore créé côté serveur : on retire la dernière question.
+    expect(stripGeneration([u0, a0, u1], "a1").map((m) => m.id)).toEqual(["u0", "a0"]);
+    expect(stripGeneration([u0, a0], null).map((m) => m.id)).toEqual(["u0", "a0"]);
+  });
+
+  it("rejoue puis suit le direct après retrait des messages partiels", () => {
+    let s = chatReducer(initialChatState, { type: "load", messages: stripGeneration([u0, a0, u1, a1Partiel], "a1") });
+    s = chatReducer(s, { type: "attach" });
+    expect(s.streaming).toBe(true);
+    s = run(s, replay);
+    expect(s.messages.map((m) => m.id)).toEqual(["u0", "a0", "u1", "a1"]);
+    expect(s.assistantId).toBe("a1");
+    // Direct
+    s = run(s, [
+      { event: "text_delta", data: { text: " est maintenu." } },
+      { event: "message_end", data: { message_id: "a1", usage: null } },
+    ]);
+    s = chatReducer(s, { type: "finish" });
+    const a1 = s.messages[3]!;
+    expect(a1.parts.map((p) => p.type)).toEqual(["thinking", "tool", "text"]);
+    expect(a1.parts[2]).toEqual({ type: "text", text: "Le report est maintenu." });
+    expect(s.streaming).toBe(false);
+  });
+
+  it("ne duplique rien si le rejeu arrive sur une conversation déjà chargée (non épurée)", () => {
+    let s = chatReducer(initialChatState, { type: "load", messages: [u0, a0, u1, a1Partiel] });
+    s = chatReducer(s, { type: "attach" });
+    s = run(s, replay);
+    expect(s.messages.map((m) => m.id)).toEqual(["u0", "a0", "u1", "a1"]);
+    // Les deltas rejoués reconstruisent le message au lieu de s'ajouter au partiel.
+    expect(s.messages[3]!.parts).toEqual([
+      { type: "thinking", text: "Je lis" },
+      expect.objectContaining({ type: "tool", call_id: "c1", status: "done" }),
+      { type: "text", text: "Le report" },
+    ]);
+  });
+
+  it("rattachement après changement de conversation : l'état précédent est entièrement remplacé", () => {
+    // Conversation A en cours de flux…
+    let s = run(sent("Question A"), [
+      { event: "message_start", data: { message_id: "xa", model_key: null, thinking_level: null } },
+      { event: "text_delta", data: { text: "Réponse A partielle" } },
+    ]);
+    // …on quitte (lecture abandonnée), puis on ouvre B dont une génération tourne en arrière-plan.
+    s = chatReducer(s, { type: "finish" });
+    s = chatReducer(s, { type: "load", messages: stripGeneration([u0, a0, u1, a1Partiel], "a1") });
+    s = chatReducer(s, { type: "attach" });
+    s = run(s, replay);
+    expect(s.messages.map((m) => m.id)).toEqual(["u0", "a0", "u1", "a1"]);
+    expect(s.messages.some((m) => m.id === "xa")).toBe(false);
+    expect(s.streaming).toBe(true);
   });
 });
 

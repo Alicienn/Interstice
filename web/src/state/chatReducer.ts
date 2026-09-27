@@ -16,6 +16,8 @@ export type ChatState = {
 export type ChatAction =
   | { type: "load"; messages: Message[] }
   | { type: "send"; localId: string; content: string; now: string }
+  /** Rattachement à une génération en cours côté serveur (GET /stream) : le rejeu va suivre. */
+  | { type: "attach" }
   | { type: "event"; event: StreamEvent; now: string }
   | { type: "local_error"; message: string; now: string }
   | { type: "finish" };
@@ -71,13 +73,14 @@ function reduceEvent(state: ChatState, ev: StreamEvent, now: string): ChatState 
           messages: state.messages.map((m) => (m.id === pending ? msg : m)),
         };
       }
-      if (state.messages.some((m) => m.id === msg.id)) return state;
+      // Rejeu : un message déjà présent est remplacé, jamais dupliqué.
+      if (state.messages.some((m) => m.id === msg.id))
+        return { ...state, messages: state.messages.map((m) => (m.id === msg.id ? msg : m)) };
       return { ...state, messages: [...state.messages, msg] };
     }
     case "message_start": {
       const { message_id, model_key, thinking_level } = ev.data;
       const existing = state.messages.find((m) => m.id === message_id);
-      if (existing) return { ...state, assistantId: message_id };
       const msg: Message = {
         id: message_id,
         role: "assistant",
@@ -86,6 +89,14 @@ function reduceEvent(state: ChatState, ev: StreamEvent, now: string): ChatState 
         model_key,
         thinking_level,
       };
+      // Rejeu : le message partiel existant est remplacé par une bulle vierge que les deltas rejoués
+      // vont reconstruire (sinon le texte serait doublé).
+      if (existing)
+        return {
+          ...state,
+          assistantId: message_id,
+          messages: state.messages.map((m) => (m.id === message_id ? { ...msg, created_at: existing.created_at } : m)),
+        };
       return { ...state, assistantId: message_id, messages: [...state.messages, msg] };
     }
     case "thinking_delta":
@@ -159,6 +170,8 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         pendingUserId: action.localId,
       };
     }
+    case "attach":
+      return { ...state, streaming: true, assistantId: null, pendingUserId: null };
     case "event":
       return reduceEvent(state, action.event, action.now);
     case "local_error": {
@@ -192,4 +205,24 @@ export function toStreamEvent(name: string, data: string): StreamEvent | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Messages d'une conversation dont une génération est en cours, prêts pour le rejeu de GET /stream :
+ * retire le message assistant partiel `generationMessageId` et le message utilisateur qui le précède
+ * (ou, si le message assistant n'existe pas encore, le dernier message s'il est de l'utilisateur).
+ */
+export function stripGeneration(messages: Message[], generationMessageId: string | null | undefined): Message[] {
+  const idx = generationMessageId ? messages.findIndex((m) => m.id === generationMessageId) : -1;
+  if (idx >= 0) {
+    let userIdx = -1;
+    for (let i = idx - 1; i >= 0; i--)
+      if (messages[i]!.role === "user") {
+        userIdx = i;
+        break;
+      }
+    return messages.filter((_, i) => i !== idx && i !== userIdx);
+  }
+  const last = messages[messages.length - 1];
+  return last && last.role === "user" ? messages.slice(0, -1) : messages;
 }

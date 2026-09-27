@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, ExternalLink, History, StickyNote } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, ExternalLink, History, ScrollText, StickyNote } from "lucide-react";
 import { api } from "../../api/client";
 import type { Renvoi, VueArticle } from "../../api/types";
 import { useAsync } from "../../hooks/useAsync";
-import { dateCourte, dateLongue, etatInfo, finOuverte, periode } from "../../lib/format";
+import { dateCourte, dateLongue, etatInfo, finOuverte, libelleCourt, nombre, periode } from "../../lib/format";
 import type { ReaderTarget } from "../../lib/reader";
 import { Breadcrumb, EtatBadge, ReaderError, ReaderLoading } from "./common";
 import { LegalHtml } from "./LegalHtml";
@@ -33,11 +33,12 @@ function Article({
   onNavigate: (t: ReaderTarget) => void;
   onArticle: (id: string) => void;
 }) {
-  const [onglet, setOnglet] = useState<"sortants" | "entrants">(
+  const doctrine = a.doctrine ?? [];
+  const [onglet, setOnglet] = useState<"sortants" | "entrants" | "doctrine">(
     a.renvois_sortants.length === 0 && a.renvois_entrants.length > 0 ? "entrants" : "sortants",
   );
   const chemin = a.chemin.length > 0 ? a.chemin : [{ id: a.texte_cid, kind: "texte" as const, titre: a.texte_titre }];
-  const renvois = onglet === "sortants" ? a.renvois_sortants : a.renvois_entrants;
+  const renvois = onglet === "sortants" ? a.renvois_sortants : onglet === "entrants" ? a.renvois_entrants : [];
   const versions = [...a.versions].sort((x, y) => y.date_debut.localeCompare(x.date_debut));
 
   return (
@@ -45,21 +46,25 @@ function Article({
       <Breadcrumb chemin={chemin} date={date} onNavigate={onNavigate} />
 
       <header className="art-head">
-        <div className="art-code">
-          <button className="linklike" onClick={() => onNavigate({ kind: "texte", id: a.texte_cid, date })} title={a.texte_titre}>
-            {a.sigle ?? a.texte_titre}
-          </button>
-        </div>
-        <h2 className="art-num">
-          <span className="art-num-pre">Article</span> {a.num}
+        <h2 className="doc-h">
+          <span className="doc-h-pre">Article</span> {a.num}
         </h2>
         <div className="art-status">
           <EtatBadge etat={a.etat} />
           <span className="art-period">{periode(a.date_debut, a.date_fin)}</span>
           {date && <span className="art-asof">· consulté au {dateCourte(date)}</span>}
-          <a className="art-lf" href={a.url_legifrance} target="_blank" rel="noopener noreferrer">
-            Légifrance <ExternalLink size={12} />
-          </a>
+          <span className="art-links">
+            <button
+              className="chip-link"
+              onClick={() => onNavigate({ kind: "texte", id: a.texte_cid, date })}
+              title={`Plan : ${a.texte_titre}`}
+            >
+              {a.sigle ?? a.texte_titre}
+            </button>
+            <a className="chip-link" href={a.url_legifrance} target="_blank" rel="noopener noreferrer">
+              Légifrance <ExternalLink size={12} />
+            </a>
+          </span>
         </div>
       </header>
 
@@ -110,7 +115,6 @@ function Article({
       )}
 
       <section className="art-section">
-        <h3 className="art-h3">Renvois</h3>
         <div className="tabs" role="tablist">
           <button role="tab" aria-selected={onglet === "sortants"} className={`tab ${onglet === "sortants" ? "on" : ""}`} onClick={() => setOnglet("sortants")}>
             <ArrowUpRight size={13} /> Cite <span className="count">{a.renvois_sortants.length}</span>
@@ -118,8 +122,35 @@ function Article({
           <button role="tab" aria-selected={onglet === "entrants"} className={`tab ${onglet === "entrants" ? "on" : ""}`} onClick={() => setOnglet("entrants")}>
             <ArrowDownLeft size={13} /> Cité par <span className="count">{a.renvois_entrants.length}</span>
           </button>
+          <button role="tab" aria-selected={onglet === "doctrine"} className={`tab ${onglet === "doctrine" ? "on" : ""}`} onClick={() => setOnglet("doctrine")}>
+            <ScrollText size={13} /> Doctrine (BOFiP) <span className="count">{doctrine.length}</span>
+          </button>
         </div>
-        {renvois.length === 0 ? (
+        {onglet === "doctrine" ? (
+          doctrine.length === 0 ? (
+            <p className="empty small">
+              {a.doctrine === undefined ? "Doctrine non fournie par le serveur." : "Aucun document BOFiP ne cite cet article."}
+            </p>
+          ) : (
+            <ul className="renvois">
+              {doctrine.map((d) => (
+                <li key={d.id}>
+                  <button className="ref-row" onClick={() => onNavigate({ kind: "bofip", id: d.id })}>
+                    <ScrollText size={14} className="ref-icon" aria-hidden />
+                    <span className="ref-main">
+                      {libelleCourt(d.titre)}
+                      {d.nature === "Actualité" && <span className="badge plain ref-badge">Actualité</span>}
+                    </span>
+                    <span className="ref-meta">
+                      <span className="mono">{d.boi}</span> · {dateCourte(d.date)} ·{" "}
+                      {d.occurrences > 1 ? `${nombre(d.occurrences)} mentions` : "1 mention"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : renvois.length === 0 ? (
           <p className="empty small">{onglet === "sortants" ? "Aucun renvoi sortant." : "Aucun article ne renvoie ici."}</p>
         ) : (
           <ul className="renvois">

@@ -1,0 +1,201 @@
+/* ─── Liste déroulante sur mesure (ui/Dropdown) ────────────────────────────── */
+
+.dd-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 280px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
+  font-weight: 500;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.dd-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.dd-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--muted);
+}
+.dd-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dd-value.placeholder {
+  color: var(--muted);
+}
+.dd-chev {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.2s var(--ease-out);
+}
+.dd-trigger.open .dd-chev {
+  transform: rotate(180deg);
+}
+
+/* Variante compacte (barre du compositeur) */
+.dd-pill {
+  height: 30px;
+  padding: 0 8px 0 10px;
+  border-radius: var(--radius-s);
+  font-size: 13px;
+}
+.dd-pill:hover:not(:disabled),
+.dd-pill.open {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+/* Variante champ de formulaire */
+.dd-field {
+  width: 100%;
+  max-width: none;
+  height: 36px;
+  padding: 0 10px 0 11px;
+  border-radius: var(--radius);
+  border-color: var(--rule-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 450;
+  box-shadow: var(--shadow-1);
+}
+.dd-field .dd-value {
+  flex: 1;
+}
+.dd-field:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+.dd-field.open {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* Fenêtre */
+.dd-pop {
+  position: fixed;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  animation: dd-in 0.16s var(--ease-out) both;
+}
+.dd-pop.up {
+  transform-origin: bottom left;
+}
+.dd-pop.down {
+  transform-origin: top left;
+}
+@keyframes dd-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.dd-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+  border-bottom: 1px solid var(--rule);
+  color: var(--muted);
+}
+.dd-search svg {
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+}
+.dd-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 34px;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.dd-search input::placeholder {
+  color: var(--muted);
+}
+
+.dd-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  outline: none;
+}
+.dd-group {
+  padding: 10px 8px 4px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.dd-group:first-child {
+  padding-top: 6px;
+}
+.dd-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 8px;
+  border-radius: var(--radius-s);
+  font-size: 13.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+.dd-opt.active {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.dd-opt.selected {
+  color: var(--ink);
+  font-weight: 500;
+}
+.dd-check {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  flex: none;
+  color: var(--accent);
+}
+.dd-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dd-hint {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.dd-empty {
+  padding: 14px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
