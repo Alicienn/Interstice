@@ -79,6 +79,17 @@ type DocRef = { kind: "article" | "section" | "texte" | "recherche"; id: string;
 | DELETE | `/conversations/{id}` | — | `204` |
 | POST | `/conversations/{id}/messages` | `{content, model_key, thinking_level: string\|null}` | **flux SSE** |
 | POST | `/conversations/{id}/stop` | — | `204` (interrompt la génération en cours) |
+| GET | `/conversations/{id}/stream` | — | **flux SSE** de la génération en cours (rejouée depuis `user_message`, puis en direct jusqu'à `message_end`) ; `204` si aucune |
+
+**Générations en arrière-plan.** Une génération tourne côté serveur indépendamment de la connexion :
+fermer le flux (changer de conversation, recharger la page) ne l'interrompt pas ; seul `/stop` (ou la
+suppression de la conversation) l'arrête. `ConversationResume` et `Conversation` portent
+`generation_en_cours: boolean` ; `Conversation` porte aussi `generation_message_id: string | null`.
+En ouvrant une conversation dont `generation_en_cours` est vrai, le frontend retire de `messages` le
+message `generation_message_id` (partiel, sauvegardé au fil de l'eau) **et le message utilisateur qui
+le précède**, puis appelle `GET /stream` : le rejeu recrée ces deux messages (`user_message`,
+`message_start`, deltas…) puis suit le direct. Les événements `user_message` / `message_start` dont l'id
+existe déjà doivent remplacer le message existant, jamais le dupliquer.
 
 ### Événements SSE (`event:` + `data:` JSON)
 

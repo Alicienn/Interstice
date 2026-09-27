@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 from typing import Any
@@ -20,6 +21,7 @@ class FauxAdaptateur:
         self.modeles = modeles or []
         self.erreur_modeles = erreur_modeles
         self.requetes: list[RequeteLLM] = []
+        self.delai = 0.0  # pause avant chaque événement (simule un modèle qui rédige lentement)
 
     async def lister_modeles(self) -> list[dict[str, Any]]:
         if self.erreur_modeles:
@@ -31,6 +33,8 @@ class FauxAdaptateur:
         self.requetes.append(RequeteLLM(**{**requete.__dict__,
                                            "historique": json.loads(json.dumps(requete.historique))}))
         for ev in self.tours.pop(0):
+            if self.delai:
+                await asyncio.sleep(self.delai)
             if isinstance(ev, Exception):
                 raise ev
             yield ev

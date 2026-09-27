@@ -17,6 +17,7 @@ import importlib
 import json
 import logging
 import sqlite3
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Literal
 
@@ -30,6 +31,7 @@ from interstice.outils import vues
 from interstice.outils.base import Outil
 from interstice.web import agent
 from interstice.web.corpus import CorpusIndisponible, etat_corpus, ouvrir_corpus
+from interstice.web.generations import Gestionnaire
 from interstice.web.llm import ErreurFournisseur, creer_adaptateur
 from interstice.web.llm.anthropic_natif import URL_DEFAUT as URL_ANTHROPIC
 from interstice.web.stockage import Stockage, separer_cle
@@ -138,9 +140,14 @@ def create_app(*, stockage: Stockage | None = None,
     fabrique = fabrique_adaptateur or creer_adaptateur
     corpus = Path(chemin_corpus) if chemin_corpus is not None else config.DB_PATH
     dossier_dist = Path(dist) if dist is not None else config.ROOT / "web" / "dist"
-    generations: dict[str, asyncio.Event] = {}
+    generations = Gestionnaire()
 
-    app = FastAPI(title="Interstice", version="0.1.0")
+    @asynccontextmanager
+    async def cycle_de_vie(_app: FastAPI) -> AsyncIterator[None]:
+        yield
+        await generations.fermer()
+
+    app = FastAPI(title="Interstice", version="0.1.0", lifespan=cycle_de_vie)
     app.state.stockage = st
     app.state.generations = generations
     app.add_middleware(CORSMiddleware, allow_origins=ORIGINES_DEV, allow_credentials=True,
@@ -239,7 +246,7 @@ def create_app(*, stockage: Stockage | None = None,
 
     @app.get("/api/conversations")
     def lister_conversations() -> list[dict[str, Any]]:
-        return st.lister_conversations()
+        return [{**c, "generation_en_cours": c["id"] in generations} for c in st.lister_conversations()]
 
     @app.post("/api/conversations")
     def creer_conversation(corps: ConversationIn | None = None) -> dict[str, Any]:
@@ -250,7 +257,24 @@ def create_app(*, stockage: Stockage | None = None,
         c = st.conversation(cid)
         if not c:
             raise HTTPException(404, "conversation introuvable")
-        return c
+        gen = generations.get(cid)
+        # Génération en cours : le frontend retire ce message (partiel, sauvegardé au fil de l'eau)
+        # et se rattache au flux via GET /stream, qui le rejoue depuis son début.
+        return {**c, "generation_en_cours": gen is not None,
+                "generation_message_id": gen.message_id if gen else None}
+
+    @app.get("/api/conversations/{cid}/stream")
+    async def suivre_generation(cid: str) -> Response:
+        gen = generations.get(cid)
+        if gen is None:
+            return Response(status_code=204)
+
+        async def flux() -> AsyncIterator[str]:
+            async for evenement, donnees in gen.suivre():
+                yield _sse(evenement, donnees)
+
+        return StreamingResponse(flux(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @app.patch("/api/conversations/{cid}")
     def renommer_conversation(cid: str, corps: ConversationPatch) -> dict[str, Any]:
@@ -261,18 +285,14 @@ def create_app(*, stockage: Stockage | None = None,
 
     @app.delete("/api/conversations/{cid}", status_code=204)
     def supprimer_conversation(cid: str) -> Response:
-        ev = generations.get(cid)
-        if ev:
-            ev.set()
+        generations.arreter(cid)
         if not st.supprimer_conversation(cid):
             raise HTTPException(404, "conversation introuvable")
         return Response(status_code=204)
 
     @app.post("/api/conversations/{cid}/stop", status_code=204)
     def arreter(cid: str) -> Response:
-        ev = generations.get(cid)
-        if ev:
-            ev.set()
+        generations.arreter(cid)
         return Response(status_code=204)
 
     @app.post("/api/conversations/{cid}/messages")
@@ -306,18 +326,13 @@ def create_app(*, stockage: Stockage | None = None,
             model_id=model_id, model_key=corps.model_key, niveau_reflexion=niveau,
             outils=fournir_outils(), ouvrir_corpus=lambda: ouvrir_corpus(corpus), arret=arret)
 
+        # La génération tourne dans une tâche de fond : fermer la connexion (quitter la conversation)
+        # ne fait que désabonner ce flux ; seul POST /stop l'interrompt.
+        gen = generations.demarrer(cid, arret, lambda: agent.generer(ctx))
+
         async def flux() -> AsyncIterator[str]:
-            # Enregistrée ici (et non avant) : si le flux ne démarre jamais, rien ne reste bloqué.
-            if cid in generations:
-                yield _sse("error", {"message": "une génération est déjà en cours"})
-                return
-            generations[cid] = arret
-            try:
-                async for evenement, donnees in agent.generer(ctx):
-                    yield _sse(evenement, donnees)
-            finally:
-                if generations.get(cid) is arret:
-                    del generations[cid]
+            async for evenement, donnees in gen.suivre():
+                yield _sse(evenement, donnees)
 
         return StreamingResponse(flux(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache",
