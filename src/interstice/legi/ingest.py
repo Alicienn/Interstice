@@ -162,8 +162,11 @@ def _supprimer(conn: sqlite3.Connection, ligne: str) -> tuple[str, bool]:
 
 
 def ingerer_archive(conn: sqlite3.Connection, path: Path, sha256: str | None = None,
-                    processus: int = 4, base_vide: bool = False) -> dict:
+                    processus: int = 4, base_vide: bool = False, pool=None) -> dict:
     """Ingère une archive. `base_vide` évite les DELETE préalables (première ingestion)."""
+    if pool is None:
+        with Pool(processus) as p:
+            return ingerer_archive(conn, path, sha256, processus, base_vide, p)
     archive = path.name
     debut = time.strftime("%Y-%m-%dT%H:%M:%S")
     lecteur = _Lecteur(path)
@@ -210,15 +213,14 @@ def ingerer_archive(conn: sqlite3.Connection, path: Path, sha256: str | None = N
 
     conn.execute("BEGIN")
     n = 0
-    with Pool(processus) as pool:
-        for resultats in pool.imap(_traiter_lot, lecteur.lots(archive), chunksize=1):
-            for res in resultats:
-                appliquer(res)
-            n += len(resultats)
-            if n % 50_000 < LOT:
-                conn.execute("COMMIT")
-                conn.execute("BEGIN")
-                print(f"  {archive}: {n} fichiers ({n / max(time.time() - t0, 1e-9):.0f}/s)", flush=True)
+    for resultats in pool.imap(_traiter_lot, lecteur.lots(archive), chunksize=1):
+        for res in resultats:
+            appliquer(res)
+        n += len(resultats)
+        if n % 50_000 < LOT:
+            conn.execute("COMMIT")
+            conn.execute("BEGIN")
+            print(f"  {archive}: {n} fichiers ({n / max(time.time() - t0, 1e-9):.0f}/s)", flush=True)
 
     # Suppressions : appliquées en fin d'archive, sauf pour un objet republié dans la même archive.
     for ligne in lecteur.suppressions:
@@ -287,13 +289,15 @@ def ingerer_chaine(conn: sqlite3.Connection, paths: Iterable[Path], manifest: di
     deja = {r[0]: r[1] for r in conn.execute("SELECT archive, sha256 FROM ingestion")}
     base_vide = not deja and conn.execute("SELECT count(*) FROM articles").fetchone()[0] == 0
     faits = []
-    for p in paths:
-        sha = manifest.get(p.name, {}).get("sha256")
-        if p.name in deja and deja[p.name] == sha:
-            continue
-        print(f"Ingestion de {p.name}", flush=True)
-        faits.append(ingerer_archive(conn, p, sha, processus=processus, base_vide=base_vide))
-        base_vide = False
+    a_faire = [p for p in paths
+               if not (p.name in deja and deja[p.name] == manifest.get(p.name, {}).get("sha256"))]
+    if a_faire:
+        with Pool(processus) as pool:
+            for p in a_faire:
+                print(f"Ingestion de {p.name}", flush=True)
+                faits.append(ingerer_archive(conn, p, manifest.get(p.name, {}).get("sha256"),
+                                             processus=processus, base_vide=base_vide, pool=pool))
+                base_vide = False
     if faits:
         print("Regroupement des versions en articles logiques…", flush=True)
         n = recalculer_cles(conn)
