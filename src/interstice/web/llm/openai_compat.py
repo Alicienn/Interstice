@@ -42,7 +42,9 @@ _MOTIFS_REFLEXION = [
     r"^gemini-(?:2\.5|3)",
 ]
 
-_CLES_CONTEXTE = ("context_length", "context_window", "max_model_len", "max_context_length")
+_CLES_CONTEXTE = ("context_length", "context_window", "max_model_len", "max_context_length",
+                  "max_input_tokens", "inputTokenLimit")
+MAX_PAGES = 50
 
 
 def est_openrouter(base_url: str) -> bool:
@@ -159,29 +161,61 @@ class AdaptateurOpenAI:
                                  timeout=httpx.Timeout(self._timeout, connect=15.0))
 
     async def lister_modeles(self) -> list[dict[str, Any]]:
+        """`GET {base}/models` avec pagination (has_more/after_id, next_page_token, next).
+
+        L'URL de base est un préfixe (`https://passerelle/openai/v1` garde ses segments). Une entrée
+        sans identifiant est ignorée plutôt que de faire échouer toute la liste.
+        """
+        url, params = f"{self.base_url}/models", None
+        items: list[Any] = []
         try:
             async with self._client() as c:
-                r = await c.get(f"{self.base_url}/models")
+                for _ in range(MAX_PAGES):
+                    r = await c.get(url, params=params)
+                    if r.status_code >= 400:
+                        raise ErreurFournisseur(
+                            f"GET /models a répondu {r.status_code}"
+                            + (" (vérifiez la clé API)" if r.status_code in (401, 403) else "")
+                            + f" : {_message_erreur(r.text)}", r.status_code)
+                    try:
+                        d = r.json()
+                    except ValueError as e:
+                        raise ErreurFournisseur("Réponse de /models illisible (JSON attendu).") from e
+                    page = (d.get("data") if isinstance(d.get("data"), list) else d.get("models", [])) \
+                        if isinstance(d, dict) else d
+                    if not isinstance(page, list):
+                        raise ErreurFournisseur("Réponse de /models inattendue (liste attendue).")
+                    items += page
+                    if not isinstance(d, dict) or not page:
+                        break
+                    dernier = page[-1].get("id") if isinstance(page[-1], dict) else None
+                    jeton = d.get("next_page_token") or d.get("nextPageToken")
+                    if d.get("has_more") and (d.get("last_id") or dernier):
+                        suivant = d.get("last_id") or dernier
+                        params = {"after_id": suivant, "after": suivant, "limit": 1000}
+                    elif jeton:
+                        params = {"pageToken": jeton, "page_token": jeton}
+                    elif isinstance(d.get("next"), str) and d["next"]:
+                        url, params = httpx.URL(url).join(d["next"]), None
+                    else:
+                        break
         except httpx.HTTPError as e:
             raise ErreurFournisseur(f"Fournisseur injoignable ({self.base_url}) : {e}") from e
-        if r.status_code >= 400:
-            raise ErreurFournisseur(
-                f"GET /models a répondu {r.status_code} : {_message_erreur(r.text)}", r.status_code)
-        try:
-            d = r.json()
-        except ValueError as e:
-            raise ErreurFournisseur("Réponse de /models illisible (JSON attendu).") from e
-        items = d.get("data", d.get("models", [])) if isinstance(d, dict) else d
-        if not isinstance(items, list):
-            raise ErreurFournisseur("Réponse de /models inattendue (liste attendue).")
-        sortie = []
+        sortie: dict[str, dict[str, Any]] = {}
         for m in items:
-            if not isinstance(m, dict) or not m.get("id"):
+            if not isinstance(m, dict) or not m.get("id") and not m.get("name"):
                 continue
-            sortie.append({"id": str(m["id"]), "owned_by": m.get("owned_by"),
-                           "context_length": _contexte(m), "thinking": detecter_reflexion(m)})
-        sortie.sort(key=lambda m: m["id"])
-        return sortie
+            mid = str(m.get("id") or m.get("name"))
+            sortie[mid] = {
+                "id": mid, "owned_by": m.get("owned_by"),
+                "label": next((v for v in (m.get("display_name"), m.get("name"))
+                               if isinstance(v, str) and v and v != mid), None),
+                "context_length": _contexte(m),
+                "max_output": next((v for v in (m.get("max_output_tokens"), m.get("max_tokens"),
+                                                (m.get("top_provider") or {}).get("max_completion_tokens"))
+                                    if isinstance(v, int) and v > 0), None),
+                "thinking": detecter_reflexion(m)}
+        return sorted(sortie.values(), key=lambda m: m["id"])
 
     # ---- conversion de l'historique -------------------------------------------------------
 

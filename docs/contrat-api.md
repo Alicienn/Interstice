@@ -23,11 +23,16 @@ type Fournisseur = {
   id: string; name: string; type: "openai" | "anthropic";
   base_url: string; api_key_set: boolean; models: ModeleActive[];
 };
-type ModeleDistant = {             // renvoyé par l'API du fournisseur, non encore activé
-  id: string; owned_by?: string | null; context_length?: number | null;
-  thinking: ThinkingSupport;       // meilleure détection possible (supported=false si inconnu)
+type ModeleDistant = {             // liste de l'API du fournisseur ∪ catalogue models.dev
+  id: string; owned_by?: string | null; label?: string | null;
+  context_length?: number | null; max_output?: number | null;
+  thinking: ThinkingSupport;       // source "catalogue" (models.dev) > "api" > "heuristique"
+  origine: "api" | "api+catalogue" | "catalogue";  // "catalogue" : non listé par GET /models
   enabled: boolean;                // déjà activé chez nous
 };
+// ThinkingSupport.source peut aussi valoir "catalogue".
+// Fournisseurs reconnus d'après l'URL de base (hôte + préfixe) ; serveurs locaux : liste de l'API seule.
+// Si GET /models échoue (hors 401/403) et que le fournisseur est reconnu, le catalogue seul est renvoyé.
 ```
 
 | Méthode | Route | Corps | Réponse |

@@ -40,9 +40,12 @@ def faux():
 
 @pytest.fixture
 def client(stockage, faux, corpus, tmp_path):
+    async def catalogue_vide():
+        return {}
+
     app = create_app(stockage=stockage, outils=FAUX_OUTILS,
                      fabrique_adaptateur=lambda f: faux, chemin_corpus=corpus,
-                     dist=tmp_path / "pas_de_dist")
+                     dist=tmp_path / "pas_de_dist", catalogue=catalogue_vide)
     with TestClient(app) as c:
         yield c
 

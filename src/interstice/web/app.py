@@ -6,7 +6,8 @@
   relu à chaque requête car rempli par un autre module) ;
 - `fabrique_adaptateur` : `fournisseur (dict avec api_key) -> Adaptateur` ;
 - `chemin_corpus` : base du corpus (défaut : `config.DB_PATH`) ;
-- `dist` : dossier du frontend compilé (défaut : `web/dist`).
+- `dist` : dossier du frontend compilé (défaut : `web/dist`) ;
+- `catalogue` : coroutine renvoyant le catalogue models.dev (défaut : téléchargement + cache 24 h).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import json
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Literal
+from typing import Any, AsyncIterator, Awaitable, Callable, Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -121,8 +122,12 @@ def create_app(*, stockage: Stockage | None = None,
                outils: list[Outil] | Callable[[], list[Outil]] | None = None,
                fabrique_adaptateur: Callable[[dict[str, Any]], Any] | None = None,
                chemin_corpus: Path | str | None = None,
-               dist: Path | str | None = None) -> FastAPI:
+               dist: Path | str | None = None,
+               catalogue: Callable[[], Awaitable[dict[str, Any]]] | None = None) -> FastAPI:
     st = stockage or Stockage()
+    if catalogue is None:
+        from interstice.web.llm.catalogue import charger_catalogue as catalogue
+    catalogue_modeles = catalogue
     if outils is None:
         fournir_outils: Callable[[], list[Outil]] = _outils_par_defaut
     elif callable(outils):
@@ -189,15 +194,25 @@ def create_app(*, stockage: Stockage | None = None,
 
     @app.get("/api/providers/{pid}/remote-models")
     async def modeles_distants(pid: str) -> list[dict[str, Any]]:
+        from interstice.web.llm.catalogue import fusionner, trouver_fournisseur
+
         f = _fournisseur_ou_404(pid)
         actifs = {m["id"] for m in f["models"]}
+        # 1. catalogue models.dev (métadonnées complètes, modèles que /models ne liste pas)
+        fournisseur_cat = trouver_fournisseur(await catalogue_modeles(), f["base_url"] or "", f["type"])
+        # 2. liste de l'API ; sans elle (pas de /models, réseau), on se contente du catalogue,
+        #    sauf erreur d'authentification qui doit remonter telle quelle
         try:
-            modeles = await fabrique(f).lister_modeles()
+            modeles_api: list[dict[str, Any]] | None = await fabrique(f).lister_modeles()
         except ErreurFournisseur as e:
-            raise HTTPException(502, e.message) from e
+            if fournisseur_cat is None or e.status in (401, 403):
+                raise HTTPException(502, e.message) from e
+            log.warning("remote-models %s : %s — catalogue seul", pid, e.message)
+            modeles_api = None
         except Exception as e:  # noqa: BLE001
             log.exception("remote-models %s", pid)
             raise HTTPException(502, f"Erreur du fournisseur : {e}") from e
+        modeles = fusionner(modeles_api, fournisseur_cat, f["type"])
         return [{**m, "enabled": m["id"] in actifs} for m in modeles]
 
     @app.put("/api/providers/{pid}/models")

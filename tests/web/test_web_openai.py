@@ -189,8 +189,8 @@ def test_liste_des_modeles_et_detection_de_la_reflexion():
     modeles = asyncio.run(ad.lister_modeles())
     assert str(capture[0].url) == "https://openrouter.ai/api/v1/models"
     assert capture[0].headers["authorization"] == "Bearer k"
-    assert modeles[0] == {"id": "deepseek/deepseek-r1", "owned_by": None,
-                          "context_length": 163840,
+    assert modeles[0] == {"id": "deepseek/deepseek-r1", "owned_by": None, "label": None,
+                          "context_length": 163840, "max_output": None,
                           "thinking": {"supported": True, "levels": ["low", "medium", "high"],
                                        "source": "api"}}
     assert modeles[1]["thinking"] == {"supported": False, "levels": [], "source": "api"}
@@ -213,5 +213,39 @@ def test_heuristique_reflexion(ident, attendu):
 def test_models_erreur_donne_erreur_fournisseur():
     ad = AdaptateurOpenAI("https://x.test/v1", "k", transport=httpx.MockTransport(
         lambda r: httpx.Response(403, json={"error": {"message": "forbidden"}})))
-    with pytest.raises(ErreurFournisseur, match="403 : forbidden"):
+    with pytest.raises(ErreurFournisseur, match=r"403 \(vérifiez la clé API\) : forbidden"):
         asyncio.run(ad.lister_modeles())
+
+
+def test_models_pagination_has_more_et_jeton():
+    """Anthropic-compatible (has_more/last_id) puis Google (next_page_token) : toutes les pages lues."""
+    appels: list[httpx.Request] = []
+
+    def handler(request):
+        appels.append(request)
+        p = dict(request.url.params)
+        if "after_id" in p:
+            return httpx.Response(200, json={"data": [{"id": "m3"}], "has_more": False})
+        if "pageToken" in p:
+            return httpx.Response(200, json={"models": [{"id": "m4", "display_name": "Modèle 4",
+                                                         "inputTokenLimit": 1000}]})
+        if request.url.host == "a.test":
+            return httpx.Response(200, json={"data": [{"id": "m1"}, {"id": "m2"}], "has_more": True,
+                                             "last_id": "m2"})
+        return httpx.Response(200, json={"models": [{"id": "m0"}], "next_page_token": "t1"})
+
+    a = asyncio.run(AdaptateurOpenAI("https://a.test/v1", "k", transport=httpx.MockTransport(handler))
+                    .lister_modeles())
+    assert [m["id"] for m in a] == ["m1", "m2", "m3"]
+    assert dict(appels[1].url.params)["after_id"] == "m2"
+    g = asyncio.run(AdaptateurOpenAI("https://g.test/v1beta/openai", "k",
+                                     transport=httpx.MockTransport(handler)).lister_modeles())
+    assert [m["id"] for m in g] == ["m0", "m4"]
+    assert g[1]["label"] == "Modèle 4" and g[1]["context_length"] == 1000
+    assert str(appels[2].url) == "https://g.test/v1beta/openai/models"  # préfixe conservé
+
+
+def test_models_entree_sans_id_ignoree():
+    ad = AdaptateurOpenAI("https://x.test/v1", "k", transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, json={"data": [{"object": "model"}, {"id": "ok"}]})))
+    assert [m["id"] for m in asyncio.run(ad.lister_modeles())] == ["ok"]
