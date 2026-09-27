@@ -12,7 +12,7 @@ import sqlite3
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Literal
 
-DocKind = Literal["article", "section", "texte", "recherche"]
+DocKind = Literal["article", "section", "texte", "recherche", "bofip"]
 
 
 @dataclass

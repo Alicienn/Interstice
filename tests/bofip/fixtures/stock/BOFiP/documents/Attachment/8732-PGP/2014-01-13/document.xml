@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<document type="Attachment">
+  <parts><part>
+    <dataType>application/pdf</dataType>
+    <dataRef>data1.pdf</dataRef>
+  </part></parts>
+  <dc:dublincore xmlns:dc="http://purl.org/dc/elements/1.1">
+    <dc:title><![CDATA[Modèle de registre pour les opérations en capital se rapportant aux bons de caisse, bons du Trésor et assimilés et bons ou contrats de capitalisation]]></dc:title>
+    <dc:date>2014-01-13</dc:date>
+    <dc:creator>DGFiP</dc:creator>
+    <dc:publisher>Ministère de l'Action et des Comptes publics - DGFiP (France)</dc:publisher>
+    <dc:type>application</dc:type>
+    <dc:format>application/pdf</dc:format>
+    <dc:identifier>8732-PGP</dc:identifier>
+    <dc:source>Bulletin Officiel des Finances Publiques - Impôts</dc:source>
+    <dc:language>fr-FR</dc:language>
+    <dc:relation  type="isRequiredBy">Contenu:8730-PGP</dc:relation>
+    <dc:coverage>République française</dc:coverage>
+    <dc:rights>Accès libre - réutilisation soumise à licence</dc:rights>
+  </dc:dublincore>
+</document>

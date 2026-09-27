@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+Description des documents contenant le plan de classement BOFiP
+@title Plan de classement
+@root navigationTree
+-->
+
+<!--
+Racine du plan
+-->
+<!ELEMENT navigationTree ( doc* ) >
+
+<!--
+Document BOFiP
+<br>Il contient les références à un document de type Contenu doctrinal
+<br>Il peut encapsuler d'autres documents
+-->
+<!ELEMENT doc ( doc* ) >
+
+<!--
+Identifiant technique du document
+<br>Cette information est unique et permet de retrouver le document BOFiP
+@example 505-PGP
+-->
+<!ATTLIST doc id CDATA #REQUIRED >
+
+<!--
+Texte du noeud
+<br>C'est le titre du document tel qu'il apparaîtra dans le plan de classement
+@example Section 1 : Dérogations obligatoires
+-->
+<!ATTLIST doc label CDATA #REQUIRED >
+
+<!--
+Identifiant du noeud
+<br>Cette information correspond au code de classification du document BOFiP
+@example BOI-IR-A-20-20-10
+-->
+<!ATTLIST doc nodeId CDATA #REQUIRED >

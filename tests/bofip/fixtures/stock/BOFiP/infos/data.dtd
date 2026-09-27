@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Description des documents contenant le texte des documents doctrinaux BOFiP
+@title Document contenu doctrinal
+@root html
+-->
+
+<!--
+Eléments de type entête
+-->
+<!ENTITY % heading "h1 | h2 | h3 | h4 | h5 | h6">
+
+<!--
+Eléments de type liste
+-->
+<!ENTITY % list "ul | ol">
+
+<!--
+Eléments de type style
+-->
+<!ENTITY % fontstyle "tt | i | b">
+
+<!--
+Eléments de type phrase
+-->
+<!ENTITY % phrase "em | del | ins | strong">
+
+<!--
+Eléments de type ligne
+-->
+<!ENTITY % inline "#PCDATA | %fontstyle; | %phrase; | a | img | br | sub | sup | span">
+
+<!--
+Eléments de type ancre
+-->
+<!ENTITY % anchor "#PCDATA | %fontstyle; | %phrase; | img | br | sub | sup | span">
+
+<!--
+Eléments de type préformatté
+-->
+<!ENTITY % preformatted "#PCDATA | %fontstyle; | %phrase; | a | br | span">
+
+<!--
+Eléments de type bloc
+-->
+<!ENTITY % block "p | %heading; | %list; | pre | div | blockquote | table">
+
+<!--
+Eléments de type flux
+-->
+<!ENTITY % flow "%inline; | %block;">
+
+<!--
+Racine du document de type Contenu
+-->
+<!ELEMENT html ( body )>
+
+<!--
+Corps du document
+-->
+<!ELEMENT body ( #PCDATA | %block; )*>
+
+<!--
+Titre de niveau 1
+-->
+<!ELEMENT h1 ( %inline; )*>
+
+<!--
+Identifiant du titre 1
+-->
+<!ATTLIST h1 id CDATA #IMPLIED >
+
+<!--
+Nom du titre 1
+-->
+<!ATTLIST h1 name CDATA #IMPLIED >
+
+<!--
+Titre de niveau 2
+-->
+<!ELEMENT h2 ( %inline; )*>
+
+<!--
+Identifiant du titre 2
+-->
+<!ATTLIST h2 id CDATA #IMPLIED >
+
+<!--
+Nom du titre 2
+-->
+<!ATTLIST h2 name CDATA #IMPLIED >
+
+<!--
+Titre de niveau 3
+-->
+<!ELEMENT h3 ( %inline; )*>
+
+<!--
+Identifiant du titre 3
+-->
+<!ATTLIST h3 id CDATA #IMPLIED >
+
+<!--
+Nom du titre 3
+-->
+<!ATTLIST h3 name CDATA #IMPLIED >
+
+<!--
+Titre de niveau 4
+-->
+<!ELEMENT h4 ( %inline; )*>
+
+<!--
+Identifiant du titre 4
+-->
+<!ATTLIST h4 id CDATA #IMPLIED >
+
+<!--
+Nom du titre 4
+-->
+<!ATTLIST h4 name CDATA #IMPLIED >
+
+<!--
+Titre de niveau 5
+-->
+<!ELEMENT h5 ( %inline; )*>
+
+<!--
+Identifiant du titre 5
+-->
+<!ATTLIST h5 id CDATA #IMPLIED >
+
+<!--
+Nom du titre 5
+-->
+<!ATTLIST h5 name CDATA #IMPLIED >
+
+<!--
+Titre de niveau 6
+-->
+<!ELEMENT h6 ( %inline; )*>
+
+<!--
+Identifiant du titre 6
+-->
+<!ATTLIST h6 id CDATA #IMPLIED >
+
+<!--
+Nom du titre 6
+-->
+<!ATTLIST h6 name CDATA #IMPLIED >
+
+<!--
+Conteneur de texte
+-->
+<!ELEMENT div ( %flow; )*>
+
+<!--
+Identifiant du texte
+-->
+<!ATTLIST div id CDATA #IMPLIED >
+
+<!--
+Classe de style du conteneur
+-->
+<!ATTLIST div class CDATA #IMPLIED >
+
+<!--
+Paragraphe de texte
+-->
+<!ELEMENT p ( %inline; )*>
+
+<!--
+Identifiant du paragraphe
+-->
+<!ATTLIST p	id CDATA #IMPLIED >
+
+<!--
+Nom du paragraphe
+-->
+<!ATTLIST p	name CDATA #IMPLIED >
+
+<!--
+Classe de style du paragraphe
+-->
+<!ATTLIST p	class CDATA #IMPLIED >
+
+<!--
+Alignement du paragraphe
+-->
+<!ATTLIST p	align CDATA #IMPLIED >
+
+<!--
+Texte préformaté
+-->
+<!ELEMENT pre ( %preformatted; )*>    
+
+<!--
+Identifiant du texte préformaté
+-->
+<!ATTLIST pre id CDATA #IMPLIED >
+
+<!--
+Classe de style du texte préformaté
+-->
+<!ATTLIST pre class CDATA #IMPLIED >
+
+<!--
+Entête alternatif du texte preformate
+-->
+<!ATTLIST pre shift-headings CDATA #IMPLIED >
+
+<!--
+Citation
+-->
+<!ELEMENT blockquote ( %block; )*>
+
+<!--
+Identifiant de la citation
+-->
+<!ATTLIST blockquote id CDATA #IMPLIED >
+
+<!--
+Texte ajouté
+-->
+<!ELEMENT ins ( %flow; )*>
+
+<!--
+Texte supprimé
+-->
+<!ELEMENT del ( %flow; )*>
+
+<!--
+Définition d'un lien hypertexte
+-->
+<!ELEMENT a ( %anchor; )*>
+
+<!--
+Identifiant du lien
+-->
+<!ATTLIST a	id CDATA #IMPLIED >
+
+<!-- 
+Référence du lien
+<br>Il peut s'agir d'un lien interne (document:nnnn-XXX[#aaa]) ou externe (url)
+@example document:2718-PGP, document:3453-PGP#507_01, http://www.impots.gouv.fr
+-->
+<!ATTLIST a href CDATA #IMPLIED >
+
+<!--
+Insertion d'une image
+-->
+<!ELEMENT img EMPTY >
+
+<!--
+Identifiant de l'image
+-->
+<!ATTLIST img id CDATA #IMPLIED >
+
+<!-- 
+Emplacement du fichier source
+<br>On fait référence à un document de type Image (document:nnnn-PGP)
+@example document:1542-PGP
+-->
+<!ATTLIST img src CDATA #REQUIRED >
+
+<!--
+Alignement de l'image
+-->
+<!ATTLIST img align CDATA #IMPLIED >
+
+<!--
+Largeur de l'image
+-->
+<!ATTLIST img width CDATA #IMPLIED >
+
+<!--
+Hauteur de l'image
+-->
+<!ATTLIST img height CDATA #IMPLIED >
+
+<!--
+Largeur d'impression de l'image
+-->
+<!ATTLIST img print-width CDATA #IMPLIED >
+
+<!--
+Hauteur d'impression de l'image
+-->
+<!ATTLIST img print-height CDATA #IMPLIED >
+
+<!--
+Commentaire de l'image
+-->
+<!ATTLIST img caption CDATA #IMPLIED >
+
+<!--
+Format de l'image
+-->
+<!ATTLIST img image-type CDATA #IMPLIED >
+
+<!--
+Liste ordonnee
+-->
+<!ELEMENT ol ( ol | li )*>
+
+<!--
+Identifiant de la liste ordonnee
+-->
+<!ATTLIST ol id CDATA #IMPLIED >
+
+<!--
+Classe de style de la liste ordonnee
+-->
+<!ATTLIST ol class CDATA #IMPLIED >
+
+<!--
+Indice de depart de la liste ordonnee
+-->
+<!ATTLIST ol start CDATA #IMPLIED >
+
+<!--
+Liste non ordonnee
+-->
+<!ELEMENT ul ( ul | li )*>
+
+<!--
+Identifiant de la liste non ordonnee
+-->
+<!ATTLIST ul id CDATA #IMPLIED >
+
+<!--
+Element de liste
+-->
+<!ELEMENT li ( %flow; )*>
+
+<!--
+Identifiant de l'element de liste
+-->
+<!ATTLIST li id CDATA #IMPLIED >
+
+<!--
+Texte de type teletype
+-->
+<!ELEMENT tt ( %inline; )*>
+
+<!--
+Texte en italique
+-->
+<!ELEMENT i ( %inline; )*>
+
+<!--
+Texte en gras
+-->
+<!ELEMENT b ( %inline; )*>
+
+<!--
+Texte avec effet de style (souvent italique)
+-->
+<!ELEMENT em ( %inline; )*>
+
+<!--
+Texte en gras
+-->
+<!ELEMENT strong ( %inline; )*>
+
+<!--
+Texte en indice
+-->
+<!ELEMENT sub ( %inline; )*>
+
+<!--
+Texte en exposant
+-->
+<!ELEMENT sup ( %inline;  )*>
+
+<!--
+Conteneur de texte
+-->
+<!ELEMENT span ( %inline; )*>
+
+<!--
+Classe de style du conteneur
+-->
+<!ATTLIST span class CDATA #IMPLIED >
+
+<!--
+Retour a la ligne
+-->
+<!ELEMENT br EMPTY >
+
+<!--
+Tableau d'elements
+-->
+<!ELEMENT table ( tbody* )>
+
+<!--
+Identifiant du tableau
+-->
+<!ATTLIST table id CDATA #IMPLIED >
+
+<!--
+Classe de style du tableau
+-->
+<!ATTLIST table class CDATA #IMPLIED >
+
+<!-- 
+Largeur du tableau
+@example 10cm, 400px, ...
+-->
+<!ATTLIST table width CDATA #IMPLIED >
+
+<!-- 
+Largeur des colonnes du tableau
+@example 100px;200px;300px
+-->
+<!ATTLIST table column-widths CDATA #IMPLIED >
+
+<!--
+Largeur d'impression du tableau
+@example 10cm, 400px, ...
+-->
+<!ATTLIST table print-width CDATA #IMPLIED >
+
+<!--
+Largeur d'impression des colonnes du tableau
+@example 100px;200px;300px, 1cm;2cm;3cm
+-->
+<!ATTLIST table print-column-widths CDATA #IMPLIED >
+
+<!--
+Commentaire du tableau
+-->
+<!ATTLIST table caption CDATA #IMPLIED >
+
+<!--
+Type de tableau
+-->
+<!ATTLIST table table-type CDATA #IMPLIED >
+
+<!--
+Alignement du tableau
+-->
+<!ATTLIST table align CDATA #IMPLIED >
+
+<!--
+Corps du tableau
+-->
+<!ELEMENT tbody ( tr* )>
+
+<!--
+Ligne du tableau
+-->
+<!ELEMENT tr ( th | td )*>
+
+<!--
+Cellule du tableau
+-->
+<!ELEMENT td ( %flow; )*>
+
+<!--
+Nombre de colonnes utilisees par la cellule
+-->
+<!ATTLIST td colspan CDATA #IMPLIED >
+
+<!--
+Nombre de lignes utilisees par la cellule
+-->
+<!ATTLIST td rowspan CDATA #IMPLIED >
+
+<!--
+Alignement vertical dans la cellule
+-->
+<!ATTLIST td valign CDATA #IMPLIED >
+
+<!--
+Entete du tableau
+-->
+<!ELEMENT th ( %flow; )*>
+
+<!--
+Nombre de colonnes utilisees par l'entete
+-->
+<!ATTLIST th colspan CDATA #IMPLIED >
+
+<!--
+Nombre de lignes utilisees par l'entete
+-->
+<!ATTLIST th rowspan CDATA #IMPLIED >
+
+<!--
+Alignement vertical dans l'entete
+-->
+<!ATTLIST th valign CDATA #IMPLIED >

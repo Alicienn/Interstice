@@ -17,6 +17,8 @@ def get_outil(nom: str) -> Outil:
 
 __all__ = ["DocRef", "Outil", "Resultat", "OUTILS", "get_outil"]
 
+from interstice.outils.bofip import OUTILS_BOFIP  # noqa: E402
 from interstice.outils.legi import OUTILS_LEGI  # noqa: E402
 
 OUTILS.extend(OUTILS_LEGI)
+OUTILS.extend(OUTILS_BOFIP)

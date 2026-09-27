@@ -122,6 +122,43 @@ type LigneRecherche = { id: string; num: string; texte_titre: string; chemin: st
 Dans `html`, les renvois résolus sont des liens `<a data-article="LEGIARTI…">` que le panneau
 intercepte pour naviguer sans quitter le chat.
 
+`VueArticle` porte aussi `doctrine: {id /* PGP */, boi, titre, nature, date, occurrences}[]` : documents
+BOFiP qui citent l'article (vide si le BOFiP n'est pas ingéré).
+
+## 3 bis. BOFiP-Impôts (doctrine)
+
+`DocRef.kind` accepte `"bofip"` : `id` = identifiant PGP (`"739-PGP"`) ou `"739-PGP@AAAA-MM-JJ"` pour une
+version antérieure ; `titre` = BOI daté ; `sous_titre` = titre court ; `date` = date de publication.
+
+| Méthode | Route | Réponse |
+|---|---|---|
+| GET | `/bofip/documents/{id}` | `VueBofip` |
+| GET | `/bofip/plan?noeud=` | `VueBofipNoeud` (sans `noeud` : les séries) |
+| GET | `/bofip/recherche?q=&serie=` | `{resultats: {id, boi, titre, serie, nature, date, extrait_html}[]}` |
+
+```ts
+type MietteBofip = { id: string /* PGP ou nœud */; noeud: string; code: string | null; titre: string };
+type RefBofip = { id: string; boi: string | null; titre: string | null; nature: string | null;
+  date: string | null; disponible: boolean; type: string; cible_type: string };
+type VueBofip = {
+  id: string; pgp: string; boi: string; boi_base: string; titre: string; serie: string; division: string | null;
+  nature: "Contenu" | "Actualité"; type_contenu: string | null; date: string; permalien: string | null;
+  courant: boolean; homonymes: unknown[]; chemin: MietteBofip[]; html: string;
+  relations: { sortantes: RefBofip[]; entrantes: RefBofip[];
+               fichiers: { pgp: string; type: string; titre: string | null; mime: string | null; taille: number | null; chemin: string | null }[] };
+  articles_cites: { code: string; num: string; texte_cid: string | null; article_id: string | null;
+                    libelle: string; occurrences: number }[];
+  versions: { id: string; boi: string; date: string; motif: string }[];
+};
+type VueBofipNoeud = { noeud: string | null; id: string | null; code: string | null; titre: string;
+  chemin: MietteBofip[];
+  enfants: { noeud: string; id: string | null /* PGP si le nœud est un document */; code: string | null;
+             titre: string; origine: string; nb_documents: number }[] };
+```
+
+Dans `html` : `<a data-bofip="NNN-PGP" data-ancre="…">` (autre document BOFiP), `<a data-bofip-fichier>` (pièce
+jointe, non servie), `<img data-bofip-image>` (image non servie), `<a data-article="LEGIARTI…">` (article de loi).
+
 ## 4. Divers
 - `GET /health` → `{ok: true, db: {articles: number, derniere_ingestion: string|null}}`
 - `GET /tools` → schémas des outils exposés à l'agent (débogage).

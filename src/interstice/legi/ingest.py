@@ -110,8 +110,9 @@ class _Lecteur:
                     self.stats["repertoires"] += 1
                     continue
                 if not m.isfile():
+                    # liens symboliques eli/ : alias numéro → NOR, sans contenu ; on garde la cible
                     self.stats["autres"] += 1
-                    self.autres.append(m.name)
+                    self.autres.append(f"{m.name} -> {m.linkname}" if m.issym() or m.islnk() else m.name)
                     continue
                 base = m.name.rsplit("/", 1)[-1]
                 f = tar.extractfile(m)

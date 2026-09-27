@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<document type="PlanClassement">
+  <parts><part>
+    <dataType>application/xml</dataType>
+    <dataRef>data.xml</dataRef>
+  </part></parts>
+  <dc:dublincore xmlns:dc="http://purl.org/dc/elements/1.1">
+    <dc:title>Donnée '$field_titre_long' introuvable</dc:title>
+    <dc:date>2026-09-23</dc:date>
+    <dc:creator>DGFiP</dc:creator>
+    <dc:publisher>Ministère de l'Action et des Comptes publics - DGFiP (France)</dc:publisher>
+    <dc:type>text</dc:type>
+    <dc:format>application/xml</dc:format>
+    <dc:identifier>8-PGP</dc:identifier>
+    <dc:source>Bulletin Officiel des Finances Publiques - Impôts</dc:source>
+    <dc:language>fr-FR</dc:language>
+    <dc:coverage>République française</dc:coverage>
+    <dc:rights>Accès libre - réutilisation soumise à licence</dc:rights>
+  </dc:dublincore>
+</document>

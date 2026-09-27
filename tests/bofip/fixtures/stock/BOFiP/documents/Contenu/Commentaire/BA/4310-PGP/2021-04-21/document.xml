@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<document type="Contenu">
+  <parts><part>
+    <dataType>text/html</dataType>
+    <dataRef>data.html</dataRef>
+  </part></parts>
+  <dc:dublincore xmlns:dc="http://purl.org/dc/elements/1.1">
+    <dc:title><![CDATA[BA - Bénéfices agricoles]]></dc:title>
+    <dc:date>2021-04-21</dc:date>
+    <dc:creator>JF2A</dc:creator>
+    <dc:subject>BA</dc:subject>
+    <dc:subject>BA</dc:subject>
+    <dc:publisher>Ministère de l'Action et des Comptes publics - DGFiP (France)</dc:publisher>
+    <dc:format>text/html</dc:format>
+    <dc:identifier>4310-PGP</dc:identifier>
+    <dc:identifier>https://bofip.impots.gouv.fr/bofip/4310-PGP.html/identifiant=BOI-BA-20210421</dc:identifier>
+    <dc:source>Bulletin Officiel des Finances Publiques - Impôts</dc:source>
+    <dc:language>fr-FR</dc:language>
+    <dc:relation  type="references">Contenu:2724-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:2729-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:3535-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:3572-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:3586-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:3597-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:5792-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:6499-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:6508-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:6520-PGP</dc:relation>
+    <dc:coverage>République française</dc:coverage>
+    <dc:rights>Accès libre - réutilisation soumise à licence</dc:rights>
+  </dc:dublincore>
+  <bofip:bodgfip xmlns:bofip="https://bofip.impots.gouv.fr">
+    <bofip:contenu_type>Commentaire</bofip:contenu_type>
+    <bofip:contenu_niveau>Parent</bofip:contenu_niveau>
+    <bofip:contenu_id>BOI-BA-20210421</bofip:contenu_id>
+    <bofip:contenu_directeur_publication>Jérôme Fournel, directeur général des finances publiques</bofip:contenu_directeur_publication>
+    <bofip:contenu_isbn>2262-1954</bofip:contenu_isbn>
+  </bofip:bodgfip>
+</document>

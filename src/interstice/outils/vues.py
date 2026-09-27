@@ -109,7 +109,20 @@ def vue_article(conn: sqlite3.Connection, id: str, date: str | None = None) -> d
             entrants.append(_renvoi(conn, cat, r, "CITATION", "texte",
                                     f"{(ref_s.sigle or ref_s.titre) if ref_s else '?'}, art. {r['num']}"))
 
+    doctrine = []
+    try:  # tables BOFiP présentes seulement si le BOFiP a été ingéré
+        for r in conn.execute(
+                """SELECT d.pgp, d.boi, d.titre, d.nature, d.date_publication, count(*) AS n
+                   FROM bofip_renvois r JOIN bofip_documents d ON d.pgp = r.pgp
+                   WHERE r.texte_cid = ? AND r.num_norm = ? GROUP BY d.pgp
+                   ORDER BY d.nature = 'Actualité', n DESC LIMIT 60""", (art["texte_cid"], art["num_norm"])):
+            doctrine.append({"id": r["pgp"], "boi": r["boi"], "titre": r["titre"], "nature": r["nature"],
+                             "date": r["date_publication"], "occurrences": r["n"]})
+    except sqlite3.OperationalError:
+        pass
+
     return {
+        "doctrine": doctrine,
         "id": art["id"], "cle": art["cle"], "num": art["num"], "texte_cid": art["texte_cid"],
         "texte_titre": ref.titre if ref else (art["texte_titre"] or ""), "sigle": ref.sigle if ref else None,
         "etat": art["etat"], "date_debut": art["date_debut"], "date_fin": art["date_fin"],
@@ -194,11 +207,14 @@ def recherche(conn: sqlite3.Connection, q: str, texte: str | None = None,
 
 def etat_corpus(conn: sqlite3.Connection) -> dict[str, Any]:
     """Pour /api/health : volumes et fraîcheur de la base."""
-    meta = dict(conn.execute("SELECT cle, valeur FROM meta").fetchall())
+    try:
+        derniere = conn.execute("SELECT valeur FROM meta WHERE cle = 'derniere_ingestion'").fetchone()
+    except sqlite3.OperationalError:
+        derniere = None
+    if not derniere:
+        derniere = conn.execute("SELECT max(fin) FROM ingestion").fetchone()
     return {"articles": conn.execute("SELECT count(*) FROM articles").fetchone()[0],
-            "articles_logiques": int(meta.get("articles_logiques", 0) or 0),
-            "derniere_ingestion": meta.get("derniere_ingestion"),
-            "derniere_archive": meta.get("derniere_archive")}
+            "derniere_ingestion": derniere[0] if derniere else None}
 
 
 _CACHE_TEXTES: dict[int, tuple[sqlite3.Connection, list]] = {}

@@ -347,6 +347,23 @@ def create_app(*, stockage: Stockage | None = None,
     def textes() -> Any:
         return _vue(vues.lister_textes)
 
+    # ---- BOFiP ----------------------------------------------------------------------------
+
+    @app.get("/api/bofip/documents/{id}")
+    def bofip_document(id: str) -> Any:
+        from interstice.outils.bofip import vue_bofip
+        return _vue(vue_bofip, id)
+
+    @app.get("/api/bofip/plan")
+    def bofip_plan(noeud: str | None = None) -> Any:
+        from interstice.outils.bofip import vue_bofip_noeud
+        return _vue(vue_bofip_noeud, noeud or None)
+
+    @app.get("/api/bofip/recherche")
+    def bofip_recherche(q: str = Query(..., min_length=1), serie: str | None = None) -> dict[str, Any]:
+        from interstice.outils.bofip import recherche_bofip
+        return {"resultats": _vue(recherche_bofip, q, serie=serie or None)}
+
     # ---- frontend compilé -----------------------------------------------------------------
 
     @app.api_route("/api/{reste:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"],

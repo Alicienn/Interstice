@@ -75,7 +75,7 @@ def auditer(conn: sqlite3.Connection, dossier_archives: Path | None = None, veri
                  + ", ".join(f"`{r[0]}`" for r in conn.execute("SELECT chemin FROM vides LIMIT 3")))
     autres = conn.execute("SELECT archive, autres_fichiers FROM ingestion WHERE autres_fichiers != '[]'").fetchall()
     if autres:
-        L.append(f"Fichiers non XML rencontrés (listés, non ingérés) : "
+        L.append(f"Entrées ni répertoire ni XML (liens symboliques `eli/` alias numéro → NOR, sans contenu ; listés, non ingérés) : "
                  f"{sum(len(json.loads(a[1])) for a in autres)} — exemples : "
                  + ", ".join(f"`{x}`" for a in autres[:1] for x in json.loads(a[1])[:5]))
 

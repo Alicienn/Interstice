@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<document type="Image">
+  <parts><part>
+    <dataType>image/png</dataType>
+    <dataRef>data1.PNG</dataRef>
+  </part></parts>
+  <dc:dublincore xmlns:dc="http://purl.org/dc/elements/1.1">
+    <dc:title><![CDATA[saut de page]]></dc:title>
+    <dc:date>2014-09-22</dc:date>
+    <dc:creator>DGFiP</dc:creator>
+    <dc:publisher>Ministère de l'Action et des Comptes publics - DGFiP (France)</dc:publisher>
+    <dc:type>image</dc:type>
+    <dc:format>image/png</dc:format>
+    <dc:identifier>9695-PGP</dc:identifier>
+    <dc:source>Bulletin Officiel des Finances Publiques - Impôts</dc:source>
+    <dc:language>fr-FR</dc:language>
+    <dc:coverage>République française</dc:coverage>
+    <dc:rights>Accès libre - réutilisation soumise à licence</dc:rights>
+  </dc:dublincore>
+</document>

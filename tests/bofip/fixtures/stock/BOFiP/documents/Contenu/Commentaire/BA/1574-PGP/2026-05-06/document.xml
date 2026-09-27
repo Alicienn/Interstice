@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<document type="Contenu">
+  <parts><part>
+    <dataType>text/html</dataType>
+    <dataRef>data.html</dataRef>
+  </part></parts>
+  <dc:dublincore xmlns:dc="http://purl.org/dc/elements/1.1">
+    <dc:title><![CDATA[BA - Réductions et crédits d’impôt - Crédit d’impôt pour dépenses de formation des dirigeants]]></dc:title>
+    <dc:date>2026-05-06</dc:date>
+    <dc:creator>B2</dc:creator>
+    <dc:subject>BA</dc:subject>
+    <dc:subject>RICI</dc:subject>
+    <dc:publisher>Ministère de l'Action et des Comptes publics - DGFiP (France)</dc:publisher>
+    <dc:format>text/html</dc:format>
+    <dc:identifier>1574-PGP</dc:identifier>
+    <dc:identifier>https://bofip.impots.gouv.fr/bofip/1574-PGP.html/identifiant=BOI-BA-RICI-20-60-20260506</dc:identifier>
+    <dc:source>Bulletin Officiel des Finances Publiques - Impôts</dc:source>
+    <dc:language>fr-FR</dc:language>
+    <dc:coverage>République française</dc:coverage>
+    <dc:rights>Accès libre - réutilisation soumise à licence</dc:rights>
+  </dc:dublincore>
+  <bofip:bodgfip xmlns:bofip="https://bofip.impots.gouv.fr">
+    <bofip:contenu_type>Commentaire</bofip:contenu_type>
+    <bofip:contenu_niveau>Enfant</bofip:contenu_niveau>
+    <bofip:contenu_id>BOI-BA-RICI-20-60-20260506</bofip:contenu_id>
+    <bofip:contenu_directeur_publication>Amélie Verdier, directrice générale des finances publiques</bofip:contenu_directeur_publication>
+    <bofip:contenu_isbn>2262-1954</bofip:contenu_isbn>
+  </bofip:bodgfip>
+</document>

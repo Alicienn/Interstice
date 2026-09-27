@@ -36,6 +36,10 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--reload", action="store_true", help="rechargement auto (développement)")
 
+    from interstice.bofip.commandes import ajouter_sous_commandes
+
+    ajouter_sous_commandes(sub)  # bofip-download, bofip-ingest, bofip-audit
+
     args = p.parse_args(argv)
     if args.cmd == "download":
         from interstice.sources.dila import sync
@@ -58,6 +62,10 @@ def main(argv: list[str] | None = None) -> None:
         from interstice.mcp_server import main as mcp_main
 
         mcp_main()
+    elif args.cmd.startswith("bofip-"):
+        from interstice.bofip.commandes import executer
+
+        executer(args)
     elif args.cmd == "export-md":
         from pathlib import Path
 

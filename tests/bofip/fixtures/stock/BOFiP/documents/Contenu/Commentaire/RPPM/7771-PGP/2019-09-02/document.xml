@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<document type="Contenu">
+  <parts><part>
+    <dataType>text/html</dataType>
+    <dataRef>data.html</dataRef>
+  </part></parts>
+  <dc:dublincore xmlns:dc="http://purl.org/dc/elements/1.1">
+    <dc:title><![CDATA[RPPM - Revenus et profits du patrimoine mobilier]]></dc:title>
+    <dc:date>2019-09-02</dc:date>
+    <dc:creator>DGFIP</dc:creator>
+    <dc:subject>RPPM</dc:subject>
+    <dc:subject>RPPM</dc:subject>
+    <dc:publisher>Ministère de l'Action et des Comptes publics - DGFiP (France)</dc:publisher>
+    <dc:format>text/html</dc:format>
+    <dc:identifier>7771-PGP</dc:identifier>
+    <dc:identifier>https://bofip.impots.gouv.fr/bofip/7771-PGP.html/identifiant=BOI-RPPM-20190902</dc:identifier>
+    <dc:source>Bulletin Officiel des Finances Publiques - Impôts</dc:source>
+    <dc:language>fr-FR</dc:language>
+    <dc:relation  type="references">Contenu:3719-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:3793-PGP</dc:relation>
+    <dc:relation  type="references">Contenu:6957-PGP</dc:relation>
+    <dc:coverage>République française</dc:coverage>
+    <dc:rights>Accès libre - réutilisation soumise à licence</dc:rights>
+  </dc:dublincore>
+  <bofip:bodgfip xmlns:bofip="https://bofip.impots.gouv.fr">
+    <bofip:contenu_type>Commentaire</bofip:contenu_type>
+    <bofip:contenu_niveau>Parent</bofip:contenu_niveau>
+    <bofip:contenu_id>BOI-RPPM-20190902</bofip:contenu_id>
+    <bofip:contenu_directeur_publication>Jérôme Fournel, directeur général des finances publiques</bofip:contenu_directeur_publication>
+    <bofip:contenu_isbn>2262-1954</bofip:contenu_isbn>
+  </bofip:bodgfip>
+</document>

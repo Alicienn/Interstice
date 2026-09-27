@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Description des documents contenant les métadonnées BOFiP
+@title Document des métadonnées
+@root document
+-->
+
+<!--
+Racine du document métadonnées
+-->
+
+<!ELEMENT document ( part, dc:dublincore, bofip:bodgfip? ) >
+
+<!--
+Type de document
+@example Attachment, Contenu, Image, PlanClassement
+-->
+<!ATTLIST document type NMTOKEN #REQUIRED >
+
+<!--
+Liste des fichiers sources fournis
+<br>Un document est constitué d'un fichier source
+-->
+<!ELEMENT parts ( part ) >
+
+<!--
+Description du fichier source
+-->
+<!ELEMENT part ((dataType, dataRef))>
+
+<!--
+Type du fichier source
+@example text/html, image/png, ...
+-->
+<!ELEMENT dataType ( #PCDATA ) >
+
+<!--
+Nom du fichier source
+@example data.html, data.pdf, data.xml, data.png, ...
+-->
+<!ELEMENT dataRef ( #PCDATA ) >
+
+<!--
+Liste des métadonnnées DublinCore
+-->
+<!ELEMENT dc:dublincore ( dc:title, dc:creator+, dc:subject*, dc:publisher+, dc:date?, dc:type?, dc:format?, dc:identifier+, dc:source, dc:language, dc:relation*, dc:coverage, dc:rights ) >
+
+<!--
+Nom du domaine
+-->
+<!ATTLIST dc:dublincore xmlns:dc CDATA #REQUIRED >
+
+<!--
+Titre du document
+@example BIC - Provisions réglementées - Amortissements dérogatoires
+-->
+<!ELEMENT dc:title ( #PCDATA ) >
+
+<!--
+Date de publication du document au format aaaa-mm-jj
+@example 2012-04-30
+-->
+<!ELEMENT dc:date ( #PCDATA ) >
+
+<!--
+Créateur du document
+@example DGFiP
+-->
+<!ELEMENT dc:creator ( #PCDATA ) >
+
+<!--
+Sujet du document
+<br>Cette donnée n'est valable que pour les documents de type Contenu et contient les informations série et division
+@example BIC, Intéressement participation
+-->
+<!ELEMENT dc:subject ( #PCDATA ) >
+
+<!--
+Editeur du document
+@example Ministère du budget - DGFiP (France)
+-->
+<!ELEMENT dc:publisher ( #PCDATA ) >
+
+<!--
+Type du document
+@example application, text, image
+-->
+<!ELEMENT dc:type ( #PCDATA ) >
+
+<!--
+Format du document
+@example application/pdf, text/xml, image/png, ...
+-->
+<!ELEMENT dc:format ( #PCDATA ) >
+
+<!--
+Identifiant du document
+<br>Seul l'identifiant technique (530-PGP) est présent pour tous les documents
+<br>C'est lui qui permet de gérer les liens entre les divers documents
+<br>L'identifiant url n'est présent que pour les documents de type Contenu
+@example 530-PGP, http://bofip.impots.gouv.fr/bofip/530-PGP.html?datePubl=30/04/2012
+-->
+<!ELEMENT dc:identifier ( #PCDATA ) >
+
+<!--
+Source du document
+@example Bulletin officiel des finances publiques - Impôts
+-->
+<!ELEMENT dc:source ( #PCDATA ) >
+
+<!--
+Langue du document
+@example fr-FR
+-->
+<!ELEMENT dc:language ( #PCDATA ) >
+
+<!--
+Liens entrants et sortants du document
+<br>Cette information répertorie les documents qui possèdent une relation avec le document courant
+<br>Le lien spécifie le type de document concerné (Contenu, Attachment, Image), la catégorie de document Contenu si nécessaire et enfin l'identifiant technique du document lié
+@example Contenu.1-commentaire:528-PGP, Image:1544-PGP, ...
+-->
+<!ELEMENT dc:relation ( #PCDATA ) >
+
+<!--
+Type du lien (Permet de catégoriser le lien)
+<br>References ou Requires pour un lien sortant et isReferencedBy ou isRequiredBy pour un lien entrant
+@example References, isReferencedBy, Requires, isRequiredBy
+-->
+<!ATTLIST dc:relation type NMTOKEN #REQUIRED >
+
+<!--
+Couverture du document
+@example République française
+-->
+<!ELEMENT dc:coverage ( #PCDATA ) >
+
+<!--
+Droits d'utilisation du document
+@example Accés libre - réutilisation soumise à licence
+-->
+<!ELEMENT dc:rights ( #PCDATA ) >
+
+<!--
+Liste des métadonnées BOFiP
+<br>Ces informations sont uniquement présentes pour les documents de type Contenu
+-->
+<!ELEMENT bofip:bodgfip ( bofip:contenu_type?, bofip:contenu_niveau?, bofip:contenu_id?, bofip:contenu_directeur_publication?, bofip:contenu_isbn? ) >
+
+<!--
+Nom du domaine
+-->
+<!ATTLIST bofip:bodgfip xmlns:bofip CDATA #REQUIRED >
+
+<!--
+Type de contenu
+@example Commentaire, Barême, Formulaire, Lettre-type   modèle, Cartographie, Autres annexes
+-->
+<!ELEMENT bofip:contenu_type ( #PCDATA ) >
+
+<!--
+Niveau du contenu
+@example parent, enfant
+-->
+<!ELEMENT bofip:contenu_niveau ( #PCDATA ) >
+
+<!--
+Identifiant du contenu
+<br>Cette information contient le code de classification juridique du document de type Contenu
+@example BOI-PAT-ISF-60-30-20120430
+-->
+<!ELEMENT bofip:contenu_id ( #PCDATA ) >
+
+<!--
+Nom du directeur/trice de publication
+-->
+<!ELEMENT bofip:contenu_directeur_publication ( #PCDATA ) >
+
+<!--
+Numéro ISBN
+-->
+<!ELEMENT bofip:contenu_isbn ( #PCDATA ) >
