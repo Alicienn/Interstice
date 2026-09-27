@@ -82,7 +82,7 @@ def _index(conn: sqlite3.Connection):
     for v in nums.values():
         v.sort(key=lambda c: c[2] or "")
     titres, annexes, actes = [], {}, {}
-    for cid, nature, titre, num in conn.execute("SELECT cid, nature, titre, num FROM textes"):
+    for cid, nature, titre, num in conn.execute("SELECT cid, nature, coalesce(titrefull, titre), num FROM textes"):
         if nature == "CODE" and titre:
             titres.append((re.sub(r"\s+", " ", titre.lower()).strip(), cid))
         elif num and nature:

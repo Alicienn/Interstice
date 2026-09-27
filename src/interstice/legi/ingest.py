@@ -100,6 +100,9 @@ class _Lecteur:
         lot: list[tuple[str, bytes]] = []
         with tarfile.open(self.path, "r|gz") as tar:
             for m in tar:
+                # en mode flux, tarfile conserve chaque en-tête lu : on vide la liste pour borner
+                # la mémoire (5 millions d'entrées dans l'archive globale)
+                tar.members.clear()
                 self.stats["membres"] += 1
                 if m.isdir():
                     self.stats["repertoires"] += 1

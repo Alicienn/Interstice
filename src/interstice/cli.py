@@ -27,6 +27,11 @@ def main(argv: list[str] | None = None) -> None:
 
     sub.add_parser("mcp", help="serveur MCP (stdio) exposant les outils de navigation")
 
+    s = sub.add_parser("export-md", help="export Markdown (un fichier par article, liens wiki entre renvois)")
+    s.add_argument("--sigles", nargs="*", default=None, help="ex. CGI LPF (défaut : périmètre fiscal)")
+    s.add_argument("--dest", default=None)
+    s.add_argument("--date", default=None)
+
     s = sub.add_parser("serve", help="lance l'application web (API + frontend compilé)")
     s.add_argument("--port", type=int, default=8765)
     s.add_argument("--reload", action="store_true", help="rechargement auto (développement)")
@@ -53,6 +58,15 @@ def main(argv: list[str] | None = None) -> None:
         from interstice.mcp_server import main as mcp_main
 
         mcp_main()
+    elif args.cmd == "export-md":
+        from pathlib import Path
+
+        from interstice.config import DATA, DB_PATH
+        from interstice.export.markdown import exporter
+        from interstice.store.db import connect
+
+        dest = Path(args.dest) if args.dest else DATA / "export-md"
+        print(exporter(connect(DB_PATH, lecture_seule=True), dest, args.sigles, args.date))
 
 
 def _index(args: argparse.Namespace) -> None:

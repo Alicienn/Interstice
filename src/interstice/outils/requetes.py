@@ -67,7 +67,8 @@ def catalogue(conn: sqlite3.Connection) -> dict[str, TexteRef]:
         "SELECT cid, nature, titre, titrefull, date_debut FROM textes ORDER BY cid, date_debut"
     ).fetchall()
     for r in rows:
-        titre = r["titre"] or r["titrefull"] or r["cid"]
+        # TITREFULL est l'intitulé propre (« Code général des impôts ») ; TITRE porte des suffixes (« …, CGI. »)
+        titre = r["titrefull"] or r["titre"] or r["cid"]
         cache[r["cid"]] = TexteRef(r["cid"], titre, None, r["nature"] or "")
     for sigle, motif in SIGLES.items():
         rx = re.compile(motif, re.I)
