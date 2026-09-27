@@ -52,8 +52,9 @@ function construire(p: Prepare): Trace {
   let prochainDoc = 0;
 
   const relier = (i: number, instant: number) => {
-    // maillage : quelques traits fins vers des voisins déjà visités
-    for (const j of voisins(i, r() < 0.55 ? 3 : 2, (j) => atteint.has(j) && dist(i, j) < 0.17)) {
+    // maillage minimal : rarement, un seul trait fin vers un voisin visité très proche
+    if (r() > 0.2) return;
+    for (const j of voisins(i, 1, (j) => atteint.has(j) && dist(i, j) < 0.075)) {
       segments.push({ de: j, vers: i, t0: instant + 20, t1: instant + 20 + 90 + dist(i, j) * 600, doc: -1, secondaire: true });
     }
   };
@@ -77,7 +78,9 @@ function construire(p: Prepare): Trace {
         tau += 15;
         continue;
       }
-      cible = libres[Math.floor(r() * libres.length)];
+      // parmi les voisins libres, préférer (sans systématisme) celui qui garde le réseau centré
+      const centre = (j: number) => Math.hypot(noeuds[j].x - 0.5, noeuds[j].y - 0.5);
+      cible = r() < 0.65 ? libres.reduce((a, b) => (centre(a) < centre(b) ? a : b)) : libres[Math.floor(r() * libres.length)];
       duree = 60 + dist(courant, cible) * 700;
     }
     const t1 = tau + duree;
