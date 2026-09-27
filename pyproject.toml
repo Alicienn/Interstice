@@ -1,0 +1,28 @@
+[project]
+name = "interstice"
+version = "0.1.0"
+description = "Corpus fiscal français structuré (LEGI, BOFiP) et serveur MCP de navigation hiérarchique"
+authors = [
+    { name = "Bg", email = "alicien1234@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "lxml>=5.2",
+    "mcp>=1.2",
+]
+
+[project.scripts]
+interstice = "interstice.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"

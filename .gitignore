@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+# Données téléchargées et générées (volumineuses, reconstructibles)
+data/
+*.log
