@@ -241,8 +241,14 @@ async def generer(ctx: ContexteGeneration) -> AsyncIterator[tuple[str, dict[str,
     outils_par_nom = {o.nom: o for o in ctx.outils}
     specs = specs_outils(ctx.outils)
 
+    debut = time.monotonic()
+
+    def usage_et_duree() -> dict[str, Any]:
+        # durée réelle de la génération (affichée « A travaillé pendant … » par l'interface)
+        return {**usage.to_dict(), "duree_ms": int((time.monotonic() - debut) * 1000)}
+
     def sauver(final: bool = False) -> None:
-        st.maj_message(mid, parts=parts.liste, trace=trace, usage=usage.to_dict(),
+        st.maj_message(mid, parts=parts.liste, trace=trace, usage=usage_et_duree(),
                        error=erreur if final else None)
 
     def executer(appel: ToolCall) -> Resultat:
@@ -367,7 +373,7 @@ async def generer(ctx: ContexteGeneration) -> AsyncIterator[tuple[str, dict[str,
     st.toucher_conversation(cid)
     if erreur:
         yield "error", {"message": erreur}
-    yield "message_end", {"message_id": mid, "usage": usage.to_dict()}
+    yield "message_end", {"message_id": mid, "usage": usage_et_duree()}
 
 
 def _cloturer(parts: Parts, trace: list[dict[str, Any]], erreur: str | None) -> None:

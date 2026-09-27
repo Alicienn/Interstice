@@ -64,8 +64,10 @@ def test_deroule_complet_avec_appels_d_outils(client, faux, stockage):
                                 "titre": "Code général des impôts", "sous_titre": "Sommaire",
                                 "date": None}]
     assert evs[8][1]["documents"][0]["kind"] == "article"
-    assert evs[-1][1] == {"message_id": mid, "usage": {"input_tokens": 400, "output_tokens": 50,
-                                                       "cache_read_tokens": 330}}
+    fin = evs[-1][1]
+    assert isinstance(fin["usage"].pop("duree_ms"), int)  # durée réelle, pour « A travaillé pendant … »
+    assert fin == {"message_id": mid, "usage": {"input_tokens": 400, "output_tokens": 50,
+                                                "cache_read_tokens": 330}}
 
     # Deuxième requête : les deux résultats sont renvoyés ensemble, après l'appel.
     h = faux.requetes[1].historique

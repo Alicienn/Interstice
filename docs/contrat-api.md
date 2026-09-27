@@ -63,7 +63,8 @@ type Part =
       status: "running" | "done" | "error"; summary?: string; documents: DocRef[] };
 type Message = { id: string; role: "user" | "assistant"; parts: Part[]; created_at: string;
   model_key?: string | null; thinking_level?: string | null; error?: string | null;
-  usage?: { input_tokens?: number; output_tokens?: number; cache_read_tokens?: number } | null };
+  usage?: { input_tokens?: number; output_tokens?: number; cache_read_tokens?: number;
+            duree_ms?: number /* durée réelle de la génération, aussi dans message_end.usage */ } | null };
 type ConversationResume = { id: string; title: string; updated_at: string };
 type Conversation = ConversationResume & { messages: Message[] };
 type DocRef = { kind: "article" | "section" | "texte" | "recherche"; id: string;
