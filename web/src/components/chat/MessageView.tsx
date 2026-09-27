@@ -1,11 +1,13 @@
 import { AlertTriangle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { Message, ModeleChoix } from "../../api/types";
 import { nombre, niveauLabel } from "../../lib/format";
 import { decouperMessage } from "../../lib/journal";
 import type { ReaderTarget } from "../../lib/reader";
 import { INTERRUPTED_SUMMARY } from "../../state/chatReducer";
-import { Chrono, Etapes, Travail } from "./Journal";
+import { Travail } from "./Journal";
 import { Markdown } from "./Markdown";
+import { RideauLive } from "./Rideau";
 
 type Props = {
   message: Message;
@@ -18,6 +20,15 @@ type Props = {
 };
 
 export function MessageView({ message, live, startedAt, models, activeTarget, onOpenTarget }: Props) {
+  // Rideau : la réponse ne se révèle (animation) que si on l'a vue se terminer ; un message
+  // rouvert depuis l'historique s'affiche directement.
+  const etaitLive = useRef(live);
+  const [revele, setRevele] = useState(false);
+  useEffect(() => {
+    if (etaitLive.current && !live) setRevele(true);
+    etaitLive.current = live;
+  }, [live]);
+
   if (message.role === "user") {
     const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("\n");
     return (
@@ -31,17 +42,11 @@ export function MessageView({ message, live, startedAt, models, activeTarget, on
   const parts = message.parts;
   const u = message.usage;
 
-  // En cours : le journal se déroule dans l'ordre, l'étape courante scintille.
+  // En cours : le rideau est baissé — temps, jetons, sources lues ; rien de la réponse.
   if (live) {
     return (
       <div className="msg msg-assistant live">
-        <Chrono depuis={startedAt ?? Date.now()} />
-        {parts.length > 0 && (
-          <div className="steps">
-            <Etapes parts={parts} liveIndex={parts.length - 1} intermediaire="normal" {...nav} />
-          </div>
-        )}
-        {message.error && <Erreur message={message.error} />}
+        <RideauLive message={message} depuis={startedAt ?? Date.now()} {...nav} />
       </div>
     );
   }
@@ -53,7 +58,7 @@ export function MessageView({ message, live, startedAt, models, activeTarget, on
   const modele = models.find((m) => m.key === message.model_key);
 
   return (
-    <div className="msg msg-assistant">
+    <div className={`msg msg-assistant${revele ? " revele" : ""}`}>
       {(journal.length > 0 || interrompu) && (
         <Travail journal={journal} dureeMs={u?.duree_ms ?? null} interrompu={interrompu} {...nav} />
       )}
@@ -67,7 +72,7 @@ export function MessageView({ message, live, startedAt, models, activeTarget, on
         <div className="msg-meta">
           {message.model_key && <span>{modele ? `${modele.provider_name} · ${modele.label}` : message.model_key}</span>}
           {message.thinking_level && <span>réflexion {niveauLabel(message.thinking_level).toLowerCase()}</span>}
-          {u && (u.input_tokens != null || u.output_tokens != null) && (
+          {u && ((u.input_tokens ?? 0) > 0 || (u.output_tokens ?? 0) > 0) && (
             <span title="Jetons en entrée → en sortie (dont lus depuis le cache)">
               {nombre(u.input_tokens ?? 0)} → {nombre(u.output_tokens ?? 0)} jetons
               {u.cache_read_tokens ? ` · ${nombre(u.cache_read_tokens)} en cache` : ""}

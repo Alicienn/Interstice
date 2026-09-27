@@ -1,0 +1,167 @@
+/* Rideau : scène d'attente pendant la génération, puis révélation de la réponse. */
+
+.rideau {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  padding: 28px 0 18px;
+  animation: rideau-entree 0.5s var(--ease-out) both;
+}
+.rideau-chrono {
+  font-size: 56px;
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+}
+.rideau-etat {
+  margin: 12px 0 0;
+  max-width: 46ch;
+  min-height: 1.5em;
+  font-size: 13.5px;
+  animation: rideau-entree 0.4s var(--ease-out) both;
+}
+.rideau-compteurs {
+  display: flex;
+  gap: 36px;
+  margin-top: 20px;
+}
+.rideau-compteurs > div {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.rideau-compteurs .odometre {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.rideau-libelle {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rideau-fil {
+  position: relative;
+  width: min(320px, 80%);
+  height: 1px;
+  margin: 22px 0 14px;
+  overflow: hidden;
+  background: var(--rule);
+}
+.rideau-fil span {
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: rideau-fil 1.8s ease-in-out infinite;
+}
+.rideau-sources {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rideau-sources li {
+  opacity: calc(1 - var(--rang) * 0.26);
+  transform: scale(calc(1 - var(--rang) * 0.035));
+  transition: opacity 0.5s, transform 0.5s;
+  animation: rideau-source 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+.rideau-sources button {
+  border: 0;
+  background: none;
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.rideau-sources button:disabled {
+  cursor: default;
+}
+.rideau-sources button:not(:disabled):hover {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.rideau-action {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.rideau-objet::before {
+  content: " ";
+}
+.rideau-erreur {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--bad);
+}
+
+/* Compteur mécanique */
+.odometre {
+  display: inline-flex;
+  font-variant-numeric: tabular-nums;
+}
+.odo-col {
+  display: inline-block;
+  height: 1em;
+  line-height: 1;
+  overflow: hidden;
+}
+.odo-ruban {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.45s var(--ease-out);
+}
+.odo-ruban span,
+.odo-sep {
+  display: block;
+  height: 1em;
+  line-height: 1;
+}
+
+/* Révélation : la réponse monte ligne à ligne derrière un masque */
+.msg-assistant.revele .work,
+.msg-assistant.revele .msg-meta {
+  animation: rideau-entree 0.6s var(--ease-out) both;
+}
+.msg-assistant.revele .msg-meta {
+  animation-delay: 0.7s;
+}
+.msg-assistant.revele .md > * {
+  animation: rideau-lever 0.8s var(--ease-out) both;
+  animation-delay: calc(0.08s + var(--i, 0) * 0.07s);
+}
+.msg-assistant.revele .md > :nth-child(1) { --i: 0; }
+.msg-assistant.revele .md > :nth-child(2) { --i: 1; }
+.msg-assistant.revele .md > :nth-child(3) { --i: 2; }
+.msg-assistant.revele .md > :nth-child(4) { --i: 3; }
+.msg-assistant.revele .md > :nth-child(5) { --i: 4; }
+.msg-assistant.revele .md > :nth-child(6) { --i: 5; }
+.msg-assistant.revele .md > :nth-child(7) { --i: 6; }
+.msg-assistant.revele .md > :nth-child(8) { --i: 7; }
+.msg-assistant.revele .md > :nth-child(n + 9) { --i: 8; }
+
+@keyframes rideau-entree {
+  from { opacity: 0; transform: translateY(5px); filter: blur(3px); }
+}
+@keyframes rideau-lever {
+  from { clip-path: inset(0 0 100% 0); transform: translateY(14px); opacity: 0; }
+  to { clip-path: inset(0 0 0 0); transform: none; opacity: 1; }
+}
+@keyframes rideau-fil {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(290%); }
+}
+@keyframes rideau-source {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); filter: blur(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rideau, .rideau-etat, .rideau-sources li, .msg-assistant.revele .md > *,
+  .msg-assistant.revele .work, .msg-assistant.revele .msg-meta { animation: none; }
+  .rideau-fil span { animation: none; }
+  .odo-ruban { transition: none; }
+}
