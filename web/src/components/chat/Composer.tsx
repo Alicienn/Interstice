@@ -114,10 +114,6 @@ export function Composer(p: Props) {
                 <Brain size={14} aria-hidden /> Réflexion automatique
               </span>
             ))}
-          <span className="composer-hint">
-            <span className="kbd">Entrée</span> envoyer · <span className="kbd">Maj</span>+<span className="kbd">Entrée</span>{" "}
-            nouvelle ligne
-          </span>
           {p.streaming ? (
             <button
               type="button"

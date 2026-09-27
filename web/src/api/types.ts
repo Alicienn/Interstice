@@ -97,6 +97,7 @@ export type ToolPart = {
 export type Part = ThinkingPart | TextPart | ToolPart;
 
 export type Usage = {
+  /** Total des jetons d'entrée, y compris ceux lus depuis le cache (`cache_read_tokens` en est une partie). */
   input_tokens?: number;
   output_tokens?: number;
   cache_read_tokens?: number;
@@ -145,6 +146,7 @@ export type StreamEvent =
       event: "tool_result";
       data: { call_id: string; status: ToolStatus; summary: string; documents: DocRef[] };
     }
+  | { event: "usage"; data: { message_id: string; usage: Usage | null } }
   | { event: "message_end"; data: { message_id: string; usage: Usage | null } }
   | { event: "error"; data: { message: string } };
 

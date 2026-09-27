@@ -1,5 +1,7 @@
 // Mise en forme (français) : dates, états LEGI, noms d'outils, résumés d'arguments.
 
+import type { Usage } from "../api/types";
+
 const MOIS = [
   "janvier", "février", "mars", "avril", "mai", "juin",
   "juillet", "août", "septembre", "octobre", "novembre", "décembre",
@@ -121,6 +123,24 @@ export function resumeArguments(args: Record<string, unknown>, max = 4): [string
 
 export function nombre(n: number): string {
   return n.toLocaleString("fr-FR");
+}
+
+/** Nombre compact : 842 → « 842 » ; 1234 → « 1,2k » ; 124500 → « 125k » ; 2345678 → « 2,35M ». */
+export function compact(n: number): string {
+  const v = Math.max(0, Math.round(n));
+  const fr = (x: number, dec: number) => x.toLocaleString("fr-FR", { maximumFractionDigits: dec });
+  if (v < 1000) return String(v);
+  if (v < 99_950) return `${fr(v / 1000, 1)}k`;
+  if (v < 999_500) return `${fr(v / 1000, 0)}k`;
+  return `${fr(v / 1_000_000, v < 9_995_000 ? 2 : 1)}M`;
+}
+
+/**
+ * Total des jetons d'une génération : entrée + sortie. Les jetons lus en cache font déjà partie de
+ * l'entrée (les deux adaptateurs les y incluent) : ils ne sont pas ajoutés une seconde fois.
+ */
+export function totalJetons(u: Usage | null | undefined): number {
+  return (u?.input_tokens ?? 0) + (u?.output_tokens ?? 0);
 }
 
 /** 400000 → « 400k » ; 1048576 → « 1M » ; 8192 → « 8k ». */

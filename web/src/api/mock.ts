@@ -1119,6 +1119,7 @@ function demarrerGeneration(conv: Conversation, content: string, model_key: stri
         const args1 = { id: "LEGISCTA000006191598", date };
         parts.push({ type: "tool", call_id: call1, name: "sommaire", arguments: args1, status: "running", documents: [] });
         send("tool_call", { call_id: call1, name: "sommaire", arguments: args1 });
+        send("usage", { message_id: assistant.id, usage: { input_tokens: 6120, output_tokens: 95, cache_read_tokens: 5400 } });
         await sleep(900);
         if (!alive()) throw new Error("stop");
         const docs1: DocRef[] = [
@@ -1156,6 +1157,7 @@ function demarrerGeneration(conv: Conversation, content: string, model_key: stri
         send("tool_call", { call_id: call2, name: "lire_article", arguments: args2 });
         parts.push({ type: "tool", call_id: call3, name: "lire_article", arguments: args3, status: "running", documents: [] });
         send("tool_call", { call_id: call3, name: "lire_article", arguments: args3 });
+        send("usage", { message_id: assistant.id, usage: { input_tokens: 13_480, output_tokens: 260, cache_read_tokens: 11_500 } });
         await sleep(700);
         if (!alive()) throw new Error("stop");
         const docs2 = [docArticle(A_150_0_B_TER, "150-0 B ter", "En vigueur · depuis le 1er janvier 2024", date)];

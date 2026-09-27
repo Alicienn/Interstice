@@ -1,6 +1,6 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Message, Part, ToolPart } from "../../api/types";
-import { nombre } from "../../lib/format";
+import { compact, nombre, totalJetons } from "../../lib/format";
 import { libelleOutil } from "../../lib/journal";
 import { targetFromDoc, type ReaderTarget } from "../../lib/reader";
 
@@ -29,14 +29,24 @@ export function Odometre({ valeur }: { valeur: string }) {
   );
 }
 
-function chrono(ms: number): string {
-  const s = Math.max(0, ms) / 1000;
-  const m = Math.floor(s / 60);
-  const reste = (s - m * 60).toFixed(1).replace(".", ",").padStart(4, "0");
-  return `${String(m).padStart(2, "0")}:${reste}`;
+/** Temps écoulé « mm:ss » (les heures s'ajoutent au-delà : « 1:02:03 »). */
+export function chrono(ms: number): string {
+  const s = Math.floor(Math.max(0, ms) / 1000);
+  const h = Math.floor(s / 3600);
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-/** Estimation des jetons produits jusqu'ici (≈ 4 caractères par jeton) : l'usage exact n'arrive qu'en fin de flux. */
+/**
+ * Jetons affichés en direct : l'usage exact reçu à la fin de chaque tour (entrée + sortie, cache
+ * compté une seule fois), plus l'estimation de ce que le tour en cours a produit depuis.
+ */
+export function jetonsEnDirect(usageExact: number, estimeActuel: number, estimeAuDernierUsage: number): number {
+  return usageExact + Math.max(0, estimeActuel - estimeAuDernierUsage);
+}
+
+/** Estimation des jetons produits (≈ 4 caractères par jeton), pour le tour dont l'usage n'est pas encore connu. */
 export function jetonsEstimes(parts: Part[]): number {
   let car = 0;
   for (const p of parts) {
@@ -62,10 +72,16 @@ function etatCourant(parts: Part[]): string {
 export function RideauLive({ message, depuis, ...nav }: { message: Message; depuis: number } & Nav) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 100);
+    const t = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(t);
   }, []);
   const parts = message.parts;
+  // Point de départ de l'estimation : repris à chaque nouvel usage exact reçu.
+  const exact = totalJetons(message.usage);
+  const estime = jetonsEstimes(parts);
+  const base = useRef({ exact, estime });
+  if (base.current.exact !== exact) base.current = { exact, estime };
+  const jetons = jetonsEnDirect(exact, estime, base.current.estime);
   const outils = parts.filter((p): p is ToolPart => p.type === "tool");
   const lues = outils.filter((p) => p.status !== "running").length;
   const etat = etatCourant(parts);
@@ -78,8 +94,8 @@ export function RideauLive({ message, depuis, ...nav }: { message: Message; depu
         {etat}
       </p>
       <div className="rideau-compteurs">
-        <div title="Estimation en direct ; le décompte exact s'affiche à la fin">
-          <Odometre valeur={nombre(jetonsEstimes(parts))} />
+        <div title={`${nombre(jetons)} jetons (entrée + sortie, cache compris une seule fois) ; le tour en cours est estimé`}>
+          <Odometre valeur={compact(jetons)} />
           <span className="rideau-libelle">jetons</span>
         </div>
         <div>

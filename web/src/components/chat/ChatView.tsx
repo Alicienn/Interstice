@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
-import { AlertTriangle, Menu } from "lucide-react";
+import { AlertTriangle, PanelLeftOpen } from "lucide-react";
 import { api } from "../../api/client";
 import type { ModeleChoix, Reglages } from "../../api/types";
 import { useStoredState } from "../../hooks/useStoredState";
@@ -201,8 +201,13 @@ export function ChatView(p: Props) {
   return (
     <div className="chat">
       <header className="chat-head">
-        <button className="icon-btn only-mobile" onClick={p.onToggleSidebar} aria-label="Menu">
-          <Menu size={18} />
+        <button
+          className="icon-btn sidebar-toggle"
+          onClick={p.onToggleSidebar}
+          title="Afficher la barre latérale (Ctrl+B)"
+          aria-label="Afficher la barre latérale"
+        >
+          <PanelLeftOpen size={17} />
         </button>
         <h1 className="chat-title">{p.title || (convId ? "Sans titre" : "Nouvelle conversation")}</h1>
       </header>

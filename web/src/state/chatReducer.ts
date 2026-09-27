@@ -135,6 +135,11 @@ function reduceEvent(state: ChatState, ev: StreamEvent, now: string): ChatState 
         ),
       }));
     }
+    case "usage": {
+      const { message_id, usage } = ev.data;
+      const id = state.messages.some((m) => m.id === message_id) ? message_id : state.assistantId;
+      return id ? updateMessage(state, id, (m) => ({ ...m, usage: usage ?? null })) : state;
+    }
     case "message_end": {
       const { message_id, usage } = ev.data;
       const id = state.messages.some((m) => m.id === message_id) ? message_id : state.assistantId;
@@ -196,6 +201,7 @@ export function toStreamEvent(name: string, data: string): StreamEvent | null {
     "text_delta",
     "tool_call",
     "tool_result",
+    "usage",
     "message_end",
     "error",
   ];

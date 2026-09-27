@@ -69,6 +69,11 @@ describe("chatReducer", () => {
     expect(a.parts[2]).toMatchObject({ type: "tool", call_id: "c2", status: "running", documents: [] });
     expect(a.parts[3]).toEqual({ type: "text", text: "L'article prévoit un report." });
 
+    // Usage intermédiaire (fin d'un tour d'outils) : exposé en direct, le message reste en cours.
+    s = run(s, [{ event: "usage", data: { message_id: "m-a", usage: { input_tokens: 4, output_tokens: 2 } } }]);
+    expect(s.messages[1]?.usage).toEqual({ input_tokens: 4, output_tokens: 2 });
+    expect(s.assistantId).toBe("m-a");
+
     s = run(s, [{ event: "message_end", data: { message_id: "m-a", usage: { input_tokens: 10, output_tokens: 5 } } }]);
     expect(s.assistantId).toBeNull();
     expect(s.messages[1]?.usage).toEqual({ input_tokens: 10, output_tokens: 5 });

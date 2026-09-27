@@ -5,6 +5,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatView } from "./components/chat/ChatView";
 import { ReaderPanel } from "./components/reader/ReaderPanel";
 import { SettingsView } from "./components/settings/SettingsView";
+import { useStoredState } from "./hooks/useStoredState";
 import { useTheme } from "./hooks/useTheme";
 import { emptyHistory, pushTarget, type ReaderHistory, type ReaderTarget } from "./lib/reader";
 
@@ -21,6 +22,22 @@ export default function App() {
   const [reader, setReader] = useState<ReaderHistory>(emptyHistory);
   const [readerOpen, setReaderOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Grand écran : barre latérale repliable (mémorisée). Petit écran : tiroir (sidebarOpen).
+  const [sidebarReduite, setSidebarReduite] = useStoredState("interstice.sidebar-reduite", false);
+  const basculerSidebar = useCallback(() => {
+    if (window.matchMedia("(max-width: 820px)").matches) setSidebarOpen((o) => !o);
+    else setSidebarReduite((r) => !r);
+  }, [setSidebarReduite]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        basculerSidebar();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [basculerSidebar]);
   // Clé de montage du chat : change quand l'utilisateur choisit une conversation, mais pas
   // quand une conversation est créée à la volée par le premier envoi (le flux continue).
   const [chatSession, setChatSession] = useState(0);
@@ -85,8 +102,11 @@ export default function App() {
   };
 
   return (
-    <div className={`app ${readerOpen ? "has-reader" : ""} ${sidebarOpen ? "sidebar-open" : ""}`}>
+    <div
+      className={`app ${readerOpen ? "has-reader" : ""} ${sidebarOpen ? "sidebar-open" : ""} ${sidebarReduite ? "sidebar-reduite" : ""}`}
+    >
       <Sidebar
+        onCollapse={() => setSidebarReduite(true)}
         conversations={conversations}
         error={listError}
         currentId={vue === "chat" ? currentId : null}
@@ -121,7 +141,7 @@ export default function App() {
               void refreshModels();
             }}
             onChanged={refreshModels}
-            onToggleSidebar={() => setSidebarOpen((o) => !o)}
+            onToggleSidebar={basculerSidebar}
           />
         ) : (
           <ChatView
@@ -135,7 +155,7 @@ export default function App() {
             onCreated={(id) => setCurrentId(id)}
             onActivity={refreshConversations}
             onOpenSettings={() => setVue("settings")}
-            onToggleSidebar={() => setSidebarOpen((o) => !o)}
+            onToggleSidebar={basculerSidebar}
           />
         )}
       </main>

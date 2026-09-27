@@ -1,8 +1,9 @@
 /* ─── Structure : barre latérale | contenu | panneau de lecture ───────────── */
 
 .app {
+  --sidebar-w: 260px;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) auto;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) auto;
   /* Une seule rangée bornée à la hauteur de la fenêtre : sans cela, la rangée implicite
      prend la hauteur du contenu et plus rien ne défile (bug du panneau de lecture). */
   grid-template-rows: minmax(0, 1fr);
@@ -22,6 +23,55 @@
 
 .only-mobile {
   display: none !important;
+}
+
+/* Bouton d'en-tête pour rouvrir la barre latérale : seulement quand elle est repliée (ou sur mobile). */
+.sidebar-toggle {
+  display: none;
+  margin-left: -8px;
+}
+
+@media (min-width: 821px) {
+  .app {
+    transition: grid-template-columns 0.3s var(--ease-out);
+  }
+  .sidebar {
+    overflow: hidden;
+    transition: padding 0.3s var(--ease-out), visibility 0s;
+  }
+  /* Le contenu garde sa largeur : il est rogné pendant l'animation, jamais écrasé. */
+  .sidebar > :not(.brand-tag) {
+    min-width: calc(var(--sidebar-w) - 21px); /* largeur − marges intérieures − bordure */
+  }
+  .brand-tag {
+    white-space: nowrap;
+  }
+  .app.sidebar-reduite {
+    grid-template-columns: 0px minmax(0, 1fr) auto;
+  }
+  .app.sidebar-reduite .sidebar {
+    padding-left: 0;
+    padding-right: 0;
+    border-right-color: transparent;
+    visibility: hidden;
+    transition: padding 0.3s var(--ease-out), border-color 0.3s, visibility 0s linear 0.3s;
+  }
+  .app.sidebar-reduite .sidebar-toggle {
+    display: inline-grid;
+    animation: toggle-entree 0.3s var(--ease-out) both;
+  }
+}
+@keyframes toggle-entree {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app,
+  .sidebar {
+    transition: none !important;
+  }
 }
 
 .scrim {
@@ -251,8 +301,12 @@ body.resizing .reader-body {
   .app {
     grid-template-columns: minmax(0, 1fr);
   }
-  .only-mobile {
+  .only-mobile,
+  .sidebar-toggle {
     display: inline-grid !important;
+  }
+  .only-desktop {
+    display: none !important;
   }
   .sidebar {
     position: fixed;
@@ -272,9 +326,6 @@ body.resizing .reader-body {
     inset: 0;
     z-index: 35;
     background: rgba(10, 10, 12, 0.4);
-  }
-  .composer-hint {
-    display: none !important;
   }
 }
 

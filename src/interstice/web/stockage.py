@@ -12,7 +12,7 @@ import os
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -73,8 +73,21 @@ def chemin_app_db() -> Path:
     return Path(os.environ.get("INTERSTICE_APP_DB", config.DATA / "app.sqlite"))
 
 
+_dernier_instant: datetime | None = None
+_verrou_instant = threading.Lock()
+
+
 def maintenant() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    """Horodatage à la milliseconde, strictement croissant dans le processus : deux écritures
+    dans la même milliseconde gardent leur ordre (tri des conversations par `updated_at`)."""
+    global _dernier_instant
+    with _verrou_instant:
+        n = datetime.now(timezone.utc)
+        t = n.replace(microsecond=n.microsecond // 1000 * 1000)
+        if _dernier_instant is not None and t <= _dernier_instant:
+            t = _dernier_instant + timedelta(milliseconds=1)
+        _dernier_instant = t
+        return t.isoformat(timespec="milliseconds")
 
 
 def nouvel_id() -> str:

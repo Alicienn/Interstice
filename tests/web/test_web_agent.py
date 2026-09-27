@@ -49,7 +49,7 @@ def test_deroule_complet_avec_appels_d_outils(client, faux, stockage):
     evs = _envoyer(client, cid, cle)
     noms = [e for e, _ in evs]
     assert noms == ["user_message", "message_start", "thinking_delta", "thinking_delta",
-                    "text_delta", "tool_call", "tool_call", "tool_result", "tool_result",
+                    "text_delta", "tool_call", "tool_call", "usage", "tool_result", "tool_result",
                     "text_delta", "text_delta", "message_end"]
     d = dict(evs[:2])
     assert d["user_message"]["role"] == "user"
@@ -57,13 +57,16 @@ def test_deroule_complet_avec_appels_d_outils(client, faux, stockage):
     mid = d["message_start"]["message_id"]
     assert d["message_start"] == {"message_id": mid, "model_key": cle, "thinking_level": "high"}
     assert evs[5][1] == {"call_id": "c1", "name": "sommaire", "arguments": {"texte": "CGI"}}
-    r1 = evs[7][1]
+    u1 = evs[7][1]
+    assert u1["message_id"] == mid and isinstance(u1["usage"].pop("duree_ms"), int)
+    assert u1["usage"] == {"input_tokens": 100, "output_tokens": 20, "cache_read_tokens": 80}
+    r1 = evs[8][1]
     assert r1["call_id"] == "c1" and r1["status"] == "done"
     assert r1["summary"] == "Sommaire de CGI"
     assert r1["documents"] == [{"kind": "texte", "id": "LEGITEXT000006069577",
                                 "titre": "Code général des impôts", "sous_titre": "Sommaire",
                                 "date": None}]
-    assert evs[8][1]["documents"][0]["kind"] == "article"
+    assert evs[9][1]["documents"][0]["kind"] == "article"
     fin = evs[-1][1]
     assert isinstance(fin["usage"].pop("duree_ms"), int)  # durée réelle, pour « A travaillé pendant … »
     assert fin == {"message_id": mid, "usage": {"input_tokens": 400, "output_tokens": 50,

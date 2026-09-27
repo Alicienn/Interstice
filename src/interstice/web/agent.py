@@ -1,8 +1,8 @@
 """Boucle agent : modèle ↔ outils de navigation du corpus, événements SSE du contrat.
 
 `generer(ctx)` est un générateur asynchrone de couples `(event, data)` :
-`user_message`, `message_start`, `thinking_delta`, `text_delta`, `tool_call`, `tool_result`,
-`error`, `message_end` (toujours en dernier, même après une erreur ou une interruption).
+`user_message`, `message_start`, `thinking_delta`, `text_delta`, `tool_call`, `usage`,
+`tool_result`, `error`, `message_end` (toujours en dernier, même après une erreur ou une interruption).
 
 Les parts du message assistant et la trace LLM (historique neutre rejouable) sont persistées
 au fil de l'eau : un message partiel reste consultable après une erreur ou un arrêt.
@@ -312,6 +312,8 @@ async def generer(ctx: ContexteGeneration) -> AsyncIterator[tuple[str, dict[str,
             for a in appels:
                 parts.ajouter_outil(a)
                 yield "tool_call", {"call_id": a.id, "name": a.name, "arguments": a.arguments}
+            # Usage cumulé à la fin de chaque tour d'outils : le compteur en direct reste exact.
+            yield "usage", {"message_id": mid, "usage": usage_et_duree()}
 
             if fin.stop_reason == "max_tokens" or tours_outils >= MAX_TOURS_OUTILS:
                 if fin.stop_reason == "max_tokens":

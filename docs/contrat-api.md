@@ -102,6 +102,7 @@ existe déjà doivent remplacer le message existant, jamais le dupliquer.
 | `text_delta` | `{text}` | ajoute au bloc texte courant (markdown) |
 | `tool_call` | `{call_id, name, arguments}` | ajoute une part `tool` en `running` |
 | `tool_result` | `{call_id, status, summary, documents: DocRef[]}` | passe la part en `done`/`error`, affiche les cartes |
+| `usage` | `{message_id, usage}` | usage cumulé à la fin de chaque tour d'outils (compteur en direct) |
 | `message_end` | `{message_id, usage}` | fin |
 | `error` | `{message}` | affiche l'erreur dans la bulle |
 

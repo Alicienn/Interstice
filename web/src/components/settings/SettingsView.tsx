@@ -7,7 +7,7 @@ import {
   CloudDownload,
   KeyRound,
   Loader2,
-  Menu,
+  PanelLeftOpen,
   PenLine,
   Plus,
   Trash2,
@@ -58,8 +58,13 @@ export function SettingsView({ onBack, onChanged, onToggleSidebar }: Props) {
   return (
     <div className="settings">
       <header className="chat-head">
-        <button className="icon-btn only-mobile" onClick={onToggleSidebar} aria-label="Menu">
-          <Menu size={18} />
+        <button
+          className="icon-btn sidebar-toggle"
+          onClick={onToggleSidebar}
+          title="Afficher la barre latérale (Ctrl+B)"
+          aria-label="Afficher la barre latérale"
+        >
+          <PanelLeftOpen size={17} />
         </button>
         <button className="btn btn-ghost btn-sm" onClick={onBack}>
           <ArrowLeft size={15} /> Retour au chat

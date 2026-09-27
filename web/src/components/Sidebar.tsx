@@ -4,6 +4,7 @@ import {
   Check,
   Monitor,
   Moon,
+  PanelLeftClose,
   PenLine,
   Plus,
   ScrollText,
@@ -31,6 +32,7 @@ type Props = {
   onBrowseBofip: () => void;
   onSettings: () => void;
   onCloseMobile: () => void;
+  onCollapse: () => void;
 };
 
 const THEME_LABEL: Record<ThemeChoice, string> = {
@@ -48,6 +50,14 @@ export function Sidebar(p: Props) {
           §
         </span>
         <span className="brand-name">Interstice</span>
+        <button
+          className="icon-btn sm only-desktop"
+          onClick={p.onCollapse}
+          title="Replier la barre latérale (Ctrl+B)"
+          aria-label="Replier la barre latérale"
+        >
+          <PanelLeftClose size={16} />
+        </button>
         <button className="icon-btn sm only-mobile" onClick={p.onCloseMobile} aria-label="Fermer le menu">
           <X size={16} />
         </button>
