@@ -69,6 +69,10 @@ def auditer(conn: sqlite3.Connection, dossier_archives: Path | None = None, veri
             L.append(f"- racine `{r[2]}` : `{r[1]}`")
     else:
         L.append("✅ 0 erreur de parsing, 0 racine inconnue.")
+    n_vides = conn.execute("SELECT count(*) FROM vides").fetchone()[0]
+    if n_vides:
+        L.append(f"Fichiers XML vides à la source (0 octet dans l'archive DILA, tracés dans la table `vides`) : {n_vides} — "
+                 + ", ".join(f"`{r[0]}`" for r in conn.execute("SELECT chemin FROM vides LIMIT 3")))
     autres = conn.execute("SELECT archive, autres_fichiers FROM ingestion WHERE autres_fichiers != '[]'").fetchall()
     if autres:
         L.append(f"Fichiers non XML rencontrés (listés, non ingérés) : "

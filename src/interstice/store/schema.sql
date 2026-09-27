@@ -76,7 +76,11 @@ CREATE TABLE IF NOT EXISTS ingestion (
 CREATE TABLE IF NOT EXISTS erreurs (archive TEXT, chemin TEXT, message TEXT);
 CREATE TABLE IF NOT EXISTS inconnus (archive TEXT, chemin TEXT, racine TEXT);
 CREATE TABLE IF NOT EXISTS suppressions (archive TEXT, ligne TEXT, id TEXT, trouve INTEGER);
--- Même identifiant rencontré plusieurs fois dans une même archive (chemins différents)
-CREATE TABLE IF NOT EXISTS doublons (archive TEXT, id TEXT, chemin_retenu TEXT, chemin_ecarte TEXT, identiques INTEGER);
+-- Même identifiant rencontré plusieurs fois dans une même archive (chemins différents) :
+-- la copie à la date de modification (mtime tar) la plus récente est retenue.
+CREATE TABLE IF NOT EXISTS doublons (archive TEXT, id TEXT, chemin_retenu TEXT, chemin_ecarte TEXT,
+                                     identiques INTEGER, mtime_retenu INTEGER, mtime_ecarte INTEGER);
+-- Fichiers XML vides à la source (0 octet dans l'archive DILA)
+CREATE TABLE IF NOT EXISTS vides (archive TEXT, chemin TEXT);
 
 CREATE TABLE IF NOT EXISTS meta (cle TEXT PRIMARY KEY, valeur TEXT);

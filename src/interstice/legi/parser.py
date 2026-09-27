@@ -297,6 +297,8 @@ def _article(root: etree._Element) -> Article:
 
 
 def _eli(root: etree._Element) -> EliVersions:
+    if root.tag == "ID":  # forme courte (eli/jo/…/versions.xml) : un seul identifiant de conteneur JO
+        return EliVersions([{"id": (root.text or "").strip(), "etat": None, "debut": None, "fin": None}])
     return EliVersions([{"id": v.get("id"), "etat": v.get("etat") or None,
                          "debut": _date(v.get("debut")), "fin": _date(v.get("fin"))}
                         for v in root.findall("VERSION")])
@@ -308,6 +310,7 @@ _PARSEURS = {
     "SECTION_TA": _section,
     "ARTICLE": _article,
     "VERSIONS": _eli,
+    "ID": _eli,
 }
 
 

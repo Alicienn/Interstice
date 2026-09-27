@@ -42,8 +42,9 @@ def _contexte_json(ctx) -> str:
     return json.dumps([[asdict(t) for t in niveau] for niveau in ctx.niveaux], ensure_ascii=False)
 
 
-def _traiter_un(nom: str, data: bytes, archive: str) -> tuple:
-    digest = hashlib.blake2b(data, digest_size=8).digest()
+def _traiter_un(nom: str, data: bytes, mtime: int, archive: str) -> tuple:
+    # res[1] = (empreinte du contenu, date de modification dans l'archive)
+    digest = (hashlib.blake2b(data, digest_size=8).digest(), mtime)
     try:
         obj = parse(data)
     except etree.XMLSyntaxError as e:
@@ -76,9 +77,9 @@ def _traiter_un(nom: str, data: bytes, archive: str) -> tuple:
     return (nom, digest, "inconnu", obj.racine)
 
 
-def _traiter_lot(args: tuple[str, list[tuple[str, bytes]]]) -> list[tuple]:
+def _traiter_lot(args: tuple[str, list[tuple[str, bytes, int]]]) -> list[tuple]:
     archive, lot = args
-    return [_traiter_un(nom, data, archive) for nom, data in lot]
+    return [_traiter_un(nom, data, mtime, archive) for nom, data, mtime in lot]
 
 
 # ------------------------------------------------------------ côté processus principal
@@ -94,10 +95,11 @@ class _Lecteur:
         self.path = path
         self.stats = Counter()
         self.autres: list[str] = []
+        self.vides: list[str] = []
         self.suppressions: list[str] = []
 
-    def lots(self, archive: str) -> Iterator[tuple[str, list[tuple[str, bytes]]]]:
-        lot: list[tuple[str, bytes]] = []
+    def lots(self, archive: str) -> Iterator[tuple[str, list[tuple[str, bytes, int]]]]:
+        lot: list[tuple[str, bytes, int]] = []
         with tarfile.open(self.path, "r|gz") as tar:
             for m in tar:
                 # en mode flux, tarfile conserve chaque en-tête lu : on vide la liste pour borner
@@ -122,7 +124,10 @@ class _Lecteur:
                     self.autres.append(m.name)
                     continue
                 self.stats["xml"] += 1
-                lot.append((m.name, data))
+                if not data.strip():  # fichier vide à la source (constaté dans eli/) : tracé, pas parsé
+                    self.vides.append(m.name)
+                    continue
+                lot.append((m.name, data, int(m.mtime)))
                 if len(lot) >= LOT:
                     yield archive, lot
                     lot = []
@@ -174,7 +179,7 @@ def ingerer_archive(conn: sqlite3.Connection, path: Path, sha256: str | None = N
     debut = time.strftime("%Y-%m-%dT%H:%M:%S")
     lecteur = _Lecteur(path)
     par_type: Counter = Counter()
-    vus: dict[str, bytes] = {}  # objet → empreinte du fichier retenu (détection des doublons)
+    vus: dict[str, tuple[bytes, int]] = {}  # objet → (empreinte, mtime) du fichier retenu
     ecrits: set[str] = set()
     n_err = n_inc = 0
     t0 = time.time()
@@ -194,10 +199,22 @@ def ingerer_archive(conn: sqlite3.Connection, path: Path, sha256: str | None = N
         oid = f"{kind}:{res[3]}"
         doublon = oid in vus
         if doublon:
+            # Même objet sous deux chemins d'une même archive (ex. copie restée dans « en vigueur »
+            # après le passage du texte dans « non en vigueur ») : la copie la plus récente
+            # (mtime de l'archive) l'emporte ; à égalité, celle de « non_vigueur ».
+            (ancien_hash, ancien_mtime), (hash_, mtime) = vus[oid], digest
             table, col = _TABLE_CHEMIN[kind]
             row = conn.execute(f"SELECT {col} FROM {table} WHERE {_PK[kind]} = ?", (res[3],)).fetchone()
-            conn.execute("INSERT INTO doublons VALUES (?,?,?,?,?)",
-                         (archive, res[3], nom, row[0] if row else None, int(vus[oid] == digest)))
+            ancien_nom = row[0] if row else None
+            garder_ancien = mtime < ancien_mtime or (
+                mtime == ancien_mtime and "non_vigueur" in (ancien_nom or "") and "non_vigueur" not in nom)
+            retenu, ecarte = (ancien_nom, nom) if garder_ancien else (nom, ancien_nom)
+            conn.execute("INSERT INTO doublons VALUES (?,?,?,?,?,?,?)",
+                         (archive, res[3], retenu, ecarte, int(ancien_hash == hash_),
+                          max(mtime, ancien_mtime) if not garder_ancien else ancien_mtime,
+                          ancien_mtime if not garder_ancien else mtime))
+            if garder_ancien:
+                return
         vus[oid] = digest
         ecrits.add(res[3])
         purger = doublon or not base_vide  # sur base vide, rien à purger sauf doublon
@@ -233,6 +250,10 @@ def ingerer_archive(conn: sqlite3.Connection, path: Path, sha256: str | None = N
             continue
         oid, trouve = _supprimer(conn, ligne)
         conn.execute("INSERT INTO suppressions VALUES (?,?,?,?)", (archive, ligne, oid, int(trouve)))
+    conn.executemany("INSERT INTO vides VALUES (?,?)", [(archive, v) for v in lecteur.vides])
+    par_type["vide"] = len(lecteur.vides)
+    if not par_type["vide"]:
+        del par_type["vide"]
 
     stats = {
         "archive": archive, "sha256": sha256, "stamp": _stamp(archive),

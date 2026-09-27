@@ -10,11 +10,13 @@ FIX = Path(__file__).parents[1] / "fixtures" / "legi"
 CODE = "20250713-140000/legi/global/code_et_TNC_en_vigueur/code_en_vigueur/LEGI/TEXT/00/00/05/63/43/LEGITEXT000005634379"
 
 
-def _tar(path: Path, membres: dict[str, bytes]) -> Path:
+def _tar(path: Path, membres: dict[str, bytes | tuple[bytes, int]]) -> Path:
     with tarfile.open(path, "w:gz") as tar:
         for nom, data in membres.items():
+            data, mtime = data if isinstance(data, tuple) else (data, 0)
             info = tarfile.TarInfo(nom)
             info.size = len(data)
+            info.mtime = mtime
             tar.addfile(info, io.BytesIO(data))
         d = tarfile.TarInfo("20250713-140000/legi")
         d.type = tarfile.DIRTYPE
@@ -75,3 +77,25 @@ def test_chaine_global_puis_increment(tmp_path):
     row = conn.execute("SELECT num, num_norm, texte FROM articles").fetchone()
     assert row["num_norm"] == "R123-1" and row["texte"].startswith("I.-Les centres")
     assert json.loads(conn.execute("SELECT versions FROM eli").fetchone()[0])[0]["id"] == "JORFARTI000001146598"
+
+
+def test_doublon_la_copie_la_plus_recente_gagne(tmp_path):
+    art = _fx("article_modifie.xml")
+    perimee = art.replace(b"<ETAT>MODIFIE</ETAT>", b"<ETAT>ABROGE_DIFF</ETAT>")
+    fraiche = art.replace(b"<ETAT>MODIFIE</ETAT>", b"<ETAT>ABROGE</ETAT>")
+    base = "20250713-140000/legi/global"
+    glob = _tar(tmp_path / "Freemium_legi_global_20250713-140000.tar.gz", {
+        # la copie récente arrive d'abord, la périmée ensuite : l'ordre ne doit pas compter
+        f"{base}/code_et_TNC_non_vigueur/a/LEGIARTI000032944414.xml": (fraiche, 2000),
+        f"{base}/code_et_TNC_en_vigueur/a/LEGIARTI000032944414.xml": (perimee, 1000),
+        f"{base}/eli/jo/2013/10/17/versions.xml": (b'<?xml version="1.0"?>\n<ID>JORFCONT000028076811</ID>', 5),
+        f"{base}/eli/decision/2024/x/versions.xml": (b"", 5),
+    })
+    conn = connect(tmp_path / "t.sqlite")
+    init_schema(conn)
+    (s,) = ingerer_chaine(conn, [glob], {}, processus=1)
+    assert conn.execute("SELECT etat FROM articles").fetchone()[0] == "ABROGE"
+    d = conn.execute("SELECT chemin_retenu, mtime_retenu, mtime_ecarte FROM doublons").fetchone()
+    assert "non_vigueur" in d[0] and (d[1], d[2]) == (2000, 1000)
+    assert s["par_type"] == {"article": 2, "eli": 1, "vide": 1} and s["erreurs"] == 0 and s["inconnus"] == 0
+    assert json.loads(conn.execute("SELECT versions FROM eli").fetchone()[0])[0]["id"] == "JORFCONT000028076811"

@@ -192,6 +192,15 @@ def recherche(conn: sqlite3.Connection, q: str, texte: str | None = None,
     return out
 
 
+def etat_corpus(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Pour /api/health : volumes et fraîcheur de la base."""
+    meta = dict(conn.execute("SELECT cle, valeur FROM meta").fetchall())
+    return {"articles": conn.execute("SELECT count(*) FROM articles").fetchone()[0],
+            "articles_logiques": int(meta.get("articles_logiques", 0) or 0),
+            "derniere_ingestion": meta.get("derniere_ingestion"),
+            "derniere_archive": meta.get("derniere_archive")}
+
+
 _CACHE_TEXTES: dict[int, tuple[sqlite3.Connection, list]] = {}
 
 
