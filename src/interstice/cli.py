@@ -96,6 +96,9 @@ def _index(args: argparse.Namespace) -> None:
 
         print("Index plein texte…", flush=True)
         print(f"  {reconstruire_fts(conn):.0f} s")
+    from interstice.outils.vues import precalculer_comptes_textes
+
+    print(f"Comptes d'articles en vigueur : {len(precalculer_comptes_textes(conn))} codes", flush=True)
 
 
 def _audit(args: argparse.Namespace) -> None:

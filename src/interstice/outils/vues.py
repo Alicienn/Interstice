@@ -217,6 +217,26 @@ def etat_corpus(conn: sqlite3.Connection) -> dict[str, Any]:
             "derniere_ingestion": derniere[0] if derniere else None}
 
 
+def compter_articles_vigueur(conn: sqlite3.Connection, cids: list[str], date: str | None = None) -> dict[str, int]:
+    if not cids:
+        return {}
+    d = valider_date(date)
+    return dict(conn.execute(
+        f"""SELECT texte_cid, count(*) FROM articles WHERE etat != 'MODIFIE_MORT_NE'
+            AND (date_debut IS NULL OR date_debut <= ?) AND (date_fin IS NULL OR date_fin > ?)
+            AND texte_cid IN ({','.join('?' * len(cids))}) GROUP BY texte_cid""",
+        [d, d, *cids]).fetchall())
+
+
+def precalculer_comptes_textes(conn: sqlite3.Connection) -> dict[str, int]:
+    """Stocke dans `meta` le nombre d'articles en vigueur par code (appelé par `interstice index`)."""
+    from interstice.store.db import meta_set
+    cat = catalogue(conn)
+    comptes = compter_articles_vigueur(conn, [r.cid for r in cat.values() if r.nature == "CODE" or r.sigle])
+    meta_set(conn, "comptes_textes", json.dumps({"date": valider_date(None), "comptes": comptes}))
+    return comptes
+
+
 _CACHE_TEXTES: dict[int, tuple[sqlite3.Connection, list]] = {}
 
 
@@ -225,13 +245,13 @@ def lister_textes(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     entree = _CACHE_TEXTES.get(id(conn))
     if entree and entree[0] is conn:
         return entree[1]
-    d = valider_date(None)
     cat = catalogue(conn)
     codes = [r for r in cat.values() if r.nature == "CODE" or r.sigle]
-    comptes = dict(conn.execute(
-        f"""SELECT texte_cid, count(*) FROM articles WHERE etat != 'MODIFIE_MORT_NE' AND {en_vigueur_sql()}
-            AND texte_cid IN ({','.join('?' * len(codes))}) GROUP BY texte_cid""".replace(":d", "?"),
-        [d, d] + [r.cid for r in codes]).fetchall()) if codes else {}
+    try:  # précalculé par `interstice index` (le calcul parcourt toute la base : ~15 s)
+        ligne = conn.execute("SELECT valeur FROM meta WHERE cle = 'comptes_textes'").fetchone()
+    except sqlite3.OperationalError:
+        ligne = None
+    comptes = json.loads(ligne[0])["comptes"] if ligne else compter_articles_vigueur(conn, [r.cid for r in codes])
     out = [{"cid": r.cid, "sigle": r.sigle, "titre": r.titre, "nature": r.nature,
             "fiscal": r.sigle in SIGLES_FISCAUX, "nb_articles_vigueur": comptes.get(r.cid, 0)} for r in codes]
     out.sort(key=lambda x: (not x["fiscal"], SIGLES_FISCAUX.index(x["sigle"]) if x["fiscal"] else 0, x["titre"]))
