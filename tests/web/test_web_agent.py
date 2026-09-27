@@ -87,6 +87,7 @@ def test_deroule_complet_avec_appels_d_outils(client, faux, stockage):
     assert conv["title"] == "Quel est le taux du PFU ?"
     user, asst = conv["messages"]
     assert asst["id"] == mid and asst["error"] is None and asst["model_key"] == cle
+    assert asst["usage"].pop("duree_ms") >= 0  # persistée avec le message
     assert asst["usage"] == {"input_tokens": 400, "output_tokens": 50, "cache_read_tokens": 330}
     assert [p["type"] for p in asst["parts"]] == ["thinking", "text", "tool", "tool", "text"]
     assert asst["parts"][0]["text"] == "Il faut consulter le CGI."
