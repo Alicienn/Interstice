@@ -1,7 +1,36 @@
+# Python
 __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
-# Données téléchargées et générées (volumineuses, reconstructibles)
-data/
+.ruff_cache/
+.mypy_cache/
+
+# Downloaded and generated data (huge, rebuildable with `interstice download/ingest/index`)
+/data/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.db
+
+# Logs
 *.log
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.claude/
+
+# JS builds (web/ and labo-animations/ have their own ignores too)
+node_modules/
+dist/
+captures/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp

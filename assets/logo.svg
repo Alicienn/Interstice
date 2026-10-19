@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 220" role="img" aria-label="Interstice">
+  <title>Interstice</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f2026"/>
+      <stop offset="1" stop-color="#121216"/>
+    </linearGradient>
+  </defs>
+  <rect width="880" height="220" rx="28" fill="url(#bg)"/>
+  <g transform="translate(46 46)">
+    <rect width="128" height="128" rx="28" fill="#18181b" stroke="#c8a96a" stroke-width="3"/>
+    <text x="64" y="94" font-family="Georgia, 'Times New Roman', serif" font-size="82" font-weight="600" text-anchor="middle" fill="#f4f1ea">&#167;</text>
+  </g>
+  <text x="212" y="118" font-family="Georgia, 'Times New Roman', serif" font-size="78" font-weight="700" fill="#f4f1ea" letter-spacing="2">Interstice</text>
+  <text x="215" y="160" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="25" fill="#c8a96a" letter-spacing="1.5">AI for French tax law</text>
+</svg>
